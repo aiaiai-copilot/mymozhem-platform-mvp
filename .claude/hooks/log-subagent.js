@@ -28,26 +28,101 @@ process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
 
-    // Try to find subagent_type by looking at recent Task tool calls in tools-debug.txt
+    // Try to find subagent_type from the mapping file
     let subagentType = 'unknown';
-    const toolsDebugFile = path.join(projectDir, '.claude', 'logs', 'tools-debug.txt');
+    const mapFile = path.join(projectDir, '.claude', 'logs', 'subagent-map.jsonl');
+    const usedMapFile = path.join(projectDir, '.claude', 'logs', 'subagent-map-used.jsonl');
 
     try {
-      if (fs.existsSync(toolsDebugFile)) {
-        const toolsLog = fs.readFileSync(toolsDebugFile, 'utf8');
-        // Look for Task tool calls in the same session
-        const taskCalls = toolsLog.split('\n===').filter(entry =>
-          entry.includes(data.session_id) &&
-          entry.includes('"tool_name":"Task"') &&
-          entry.includes('subagent_type')
-        );
+      if (fs.existsSync(mapFile)) {
+        const mapData = fs.readFileSync(mapFile, 'utf8');
+        const mappings = mapData.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
 
-        // Get the most recent Task call
-        if (taskCalls.length > 0) {
-          const lastCall = taskCalls[taskCalls.length - 1];
-          const match = lastCall.match(/"subagent_type":"([^"]+)"/);
-          if (match) {
-            subagentType = match[1];
+        // Load used mappings
+        const usedMappings = new Set();
+        if (fs.existsSync(usedMapFile)) {
+          const usedData = fs.readFileSync(usedMapFile, 'utf8');
+          usedData.trim().split('\n').filter(Boolean).forEach(line => {
+            usedMappings.add(line);
+          });
+        }
+
+        if (mappings.length > 0) {
+          let matched = false;
+          let matchedMapping = null;
+          let promptFromTranscript = null;
+
+          // Read transcript to get session and prompt
+          if (data.agent_transcript_path && fs.existsSync(data.agent_transcript_path)) {
+            try {
+              const transcriptContent = fs.readFileSync(data.agent_transcript_path, 'utf8');
+              const lines = transcriptContent.split('\n').filter(Boolean);
+
+              if (lines.length > 0) {
+                const firstLine = JSON.parse(lines[0]);
+                const sessionId = firstLine.sessionId;
+
+                // Try to find the prompt in transcript (usually in first few lines)
+                for (let i = 0; i < Math.min(lines.length, 5); i++) {
+                  try {
+                    const line = JSON.parse(lines[i]);
+                    if (line.message?.role === 'user' && line.message?.content) {
+                      promptFromTranscript = line.message.content;
+                      break;
+                    }
+                  } catch (e) {
+                    continue;
+                  }
+                }
+
+                // Strategy 1: Match by prompt content (most reliable for parallel agents)
+                if (promptFromTranscript) {
+                  for (const mapping of mappings) {
+                    const mapKey = `${mapping.tool_use_id}:${mapping.subagent_type}`;
+                    if (!usedMappings.has(mapKey) &&
+                        mapping.session_id === sessionId &&
+                        promptFromTranscript.includes(mapping.description)) {
+                      subagentType = mapping.subagent_type;
+                      matchedMapping = mapKey;
+                      matched = true;
+                      break;
+                    }
+                  }
+                }
+
+                // Strategy 2: Match by session + first unused of each type
+                if (!matched) {
+                  for (const mapping of mappings) {
+                    const mapKey = `${mapping.tool_use_id}:${mapping.subagent_type}`;
+                    if (!usedMappings.has(mapKey) && mapping.session_id === sessionId) {
+                      subagentType = mapping.subagent_type;
+                      matchedMapping = mapKey;
+                      matched = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // Transcript parsing failed
+            }
+          }
+
+          // Strategy 3: Fallback to first unused mapping
+          if (!matched) {
+            for (const mapping of mappings) {
+              const mapKey = `${mapping.tool_use_id}:${mapping.subagent_type}`;
+              if (!usedMappings.has(mapKey)) {
+                subagentType = mapping.subagent_type;
+                matchedMapping = mapKey;
+                break;
+              }
+            }
+          }
+
+          // Mark this mapping as used
+          if (matchedMapping) {
+            fs.appendFileSync(usedMapFile, matchedMapping + '\n');
           }
         }
       }

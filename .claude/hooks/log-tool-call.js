@@ -38,6 +38,19 @@ process.stdin.on('end', () => {
     // Append to log file
     fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
 
+    // If this is a Task tool call, save subagent_type mapping
+    if (data.tool_name === 'Task' && data.tool_input?.subagent_type) {
+      const mapFile = path.join(projectDir, '.claude', 'logs', 'subagent-map.jsonl');
+      const mapEntry = {
+        ts: new Date().toISOString(),
+        tool_use_id: data.tool_use_id,
+        subagent_type: data.tool_input.subagent_type,
+        session_id: data.session_id,
+        description: data.tool_input.description
+      };
+      fs.appendFileSync(mapFile, JSON.stringify(mapEntry) + '\n');
+    }
+
     // Log to stderr for visibility
     process.stderr.write(`[Tool] ${entry.tool}\n`);
 
