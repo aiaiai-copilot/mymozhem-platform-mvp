@@ -12,7 +12,7 @@ A platform for organizing celebratory events (lotteries, quizzes, tastings, cont
 
 ## Documentation
 
-- `event-platform-context.md` — Architecture decisions and brainstorming results (source of truth)
+- `docs/event-platform-context.md` — Architecture decisions and brainstorming results (source of truth)
 - `docs/api/` — REST API and WebSocket protocol specifications
 - `docs/openapi.yaml` — OpenAPI 3.1 specification
 
@@ -105,7 +105,7 @@ A platform for organizing celebratory events (lotteries, quizzes, tastings, cont
 
 ## Critical Rules
 
-1. **Read context first** — Before implementing features, check `event-platform-context.md`
+1. **Read context first** — Before implementing features, check `docs/event-platform-context.md`
 2. **ALWAYS evaluate subagents** — Check the table above before coding
 3. **API First approach** — Design API before implementation
 4. **No raw SQL** — Use Prisma ORM exclusively

@@ -44,7 +44,7 @@
 **Verified working on:** Windows with MinGW bash, Node.js v22.18.0
 
 ### 4. Documentation
-- ✅ `event-platform-context.md` - Architecture decisions (source of truth)
+- ✅ `docs/event-platform-context.md` - Architecture decisions (source of truth)
 - ✅ `CLAUDE.md` - Development instructions for Claude Code
 - ✅ All subagents documented with frontmatter
 - ✅ All commands documented with usage examples
@@ -72,8 +72,9 @@
 │   ├── settings.json    # Hook configuration
 │   └── settings.local.json  # User-specific settings (gitignored)
 ├── .mcp.json            # MCP server configuration
+├── docs/
+│   └── event-platform-context.md  # Architecture decisions
 ├── CLAUDE.md            # Project instructions
-├── event-platform-context.md  # Architecture decisions
 ├── first-prompt.md      # Original task description
 ├── .gitignore
 └── handoff.md           # This file
@@ -106,7 +107,7 @@
 
 **Approach:**
 1. Use `api-designer` subagent for endpoint design
-2. Reference `event-platform-context.md` for architecture decisions
+2. Reference `docs/event-platform-context.md` for architecture decisions
 3. Use Context7 MCP for current Fastify/Socket.io documentation
 4. Design REST endpoints first, then WebSocket protocol
 5. Document in `docs/api/` directory
@@ -235,7 +236,7 @@ All commands documented in `.claude/commands/`:
 ## Context Files
 
 **Read these before starting:**
-1. `event-platform-context.md` - Architecture decisions (source of truth)
+1. `docs/event-platform-context.md` - Architecture decisions (source of truth)
 2. `CLAUDE.md` - Project instructions and conventions
 3. This handoff document
 

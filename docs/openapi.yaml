@@ -1,0 +1,1522 @@
+openapi: 3.1.0
+info:
+  title: Event Management Platform API
+  version: 1.0.0
+  description: |
+    REST API for the Event Management Platform - a headless backend for organizing celebratory events (lotteries, quizzes, tastings, contests) with unified application integration.
+
+    ## Features
+    - User authentication (OAuth Google)
+    - Room/event management
+    - Participant management with roles
+    - Prize fund management
+    - Winner selection
+    - Application registration and delegation
+    - Real-time WebSocket events (see websocket-protocol.md)
+
+    ## Authentication
+    - User: OAuth 2.0 Bearer tokens
+    - Application: API keys + JWT
+
+    ## Rate Limits
+    - Users: 100 requests/minute
+    - Applications: 1000 requests/minute
+  contact:
+    name: Platform API Support
+    email: api@platform.example.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.platform.example.com
+    description: Production server
+  - url: https://staging-api.platform.example.com
+    description: Staging server
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Authentication
+    description: User and application authentication
+  - name: Users
+    description: User profile management
+  - name: Rooms
+    description: Event/room management
+  - name: Participants
+    description: Room participant management
+  - name: Prizes
+    description: Prize fund management
+  - name: Winners
+    description: Winner selection and management
+  - name: Applications
+    description: Application registration and management
+
+security:
+  - BearerAuth: []
+
+paths:
+  # Authentication
+  /api/auth/google:
+    get:
+      tags: [Authentication]
+      summary: Initiate Google OAuth login
+      description: Redirects user to Google OAuth consent screen
+      security: []
+      responses:
+        '302':
+          description: Redirect to Google OAuth
+          headers:
+            Location:
+              schema:
+                type: string
+                example: https://accounts.google.com/o/oauth2/v2/auth?...
+
+  /api/auth/google/callback:
+    get:
+      tags: [Authentication]
+      summary: OAuth callback endpoint
+      description: Google redirects here after user authorization
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth authorization code
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuthTokenResponse'
+
+  /api/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIs...
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      expiresIn:
+                        type: integer
+                        example: 3600
+
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current authenticated user
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout current user
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Users
+  /api/users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user profile
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      description: User can only update their own profile
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Jane Doe
+                avatar:
+                  type: string
+                  format: uri
+                  example: https://example.com/avatar.jpg
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+
+    delete:
+      tags: [Users]
+      summary: Delete user account
+      description: User can only delete their own account
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Rooms
+  /api/rooms:
+    get:
+      tags: [Rooms]
+      summary: List rooms
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, completed, cancelled]
+        - name: appId
+          in: query
+          schema:
+            type: string
+        - name: isPublic
+          in: query
+          schema:
+            type: boolean
+        - name: createdBy
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of rooms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoomSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Rooms]
+      summary: Create room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoomRequest'
+      responses:
+        '201':
+          description: Room created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Room'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/rooms/{roomId}:
+    get:
+      tags: [Rooms]
+      summary: Get room details
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      responses:
+        '200':
+          description: Room details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Room'
+
+    patch:
+      tags: [Rooms]
+      summary: Update room
+      description: Only organizer can update
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoomRequest'
+      responses:
+        '200':
+          description: Room updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Room'
+
+    delete:
+      tags: [Rooms]
+      summary: Delete room
+      description: Only organizer can delete
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      responses:
+        '200':
+          description: Room deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Participants
+  /api/rooms/{roomId}/participants:
+    get:
+      tags: [Participants]
+      summary: List participants
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [participant, organizer, moderator, viewer]
+      responses:
+        '200':
+          description: List of participants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Participant'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Participants]
+      summary: Join room
+      description: Add current user as participant
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [participant, viewer]
+                  default: participant
+                metadata:
+                  type: object
+                  additionalProperties: true
+              required:
+                - role
+      responses:
+        '201':
+          description: Joined room
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Participant'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/rooms/{roomId}/participants/{participantId}:
+    get:
+      tags: [Participants]
+      summary: Get participant
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/ParticipantIdParam'
+      responses:
+        '200':
+          description: Participant details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Participant'
+
+    patch:
+      tags: [Participants]
+      summary: Update participant
+      description: Organizer/moderator can update role and metadata
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/ParticipantIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [participant, moderator, viewer]
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Participant updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Participant'
+
+    delete:
+      tags: [Participants]
+      summary: Remove participant
+      description: Organizer/moderator can remove others, participant can remove self
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/ParticipantIdParam'
+      responses:
+        '200':
+          description: Participant removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Prizes
+  /api/rooms/{roomId}/prizes:
+    get:
+      tags: [Prizes]
+      summary: List prizes
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List of prizes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Prize'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Prizes]
+      summary: Create prize
+      description: Organizer/moderator or app with prizes:write permission
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePrizeRequest'
+      responses:
+        '201':
+          description: Prize created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Prize'
+
+  /api/rooms/{roomId}/prizes/{prizeId}:
+    get:
+      tags: [Prizes]
+      summary: Get prize
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/PrizeIdParam'
+      responses:
+        '200':
+          description: Prize details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Prize'
+
+    patch:
+      tags: [Prizes]
+      summary: Update prize
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/PrizeIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                imageUrl:
+                  type: string
+                  format: uri
+                quantity:
+                  type: integer
+                  minimum: 1
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Prize updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Prize'
+
+    delete:
+      tags: [Prizes]
+      summary: Delete prize
+      description: Cannot delete prize with winners
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/PrizeIdParam'
+      responses:
+        '200':
+          description: Prize deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # Winners
+  /api/rooms/{roomId}/winners:
+    get:
+      tags: [Winners]
+      summary: List winners
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: prizeId
+          in: query
+          schema:
+            type: string
+        - name: participantId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of winners
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Winner'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Winners]
+      summary: Select winner
+      description: Organizer/moderator or app with winners:write permission
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWinnerRequest'
+      responses:
+        '201':
+          description: Winner selected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Winner'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/rooms/{roomId}/winners/{winnerId}:
+    get:
+      tags: [Winners]
+      summary: Get winner
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/WinnerIdParam'
+      responses:
+        '200':
+          description: Winner details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Winner'
+
+    delete:
+      tags: [Winners]
+      summary: Remove winner
+      description: Organizer only
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+        - $ref: '#/components/parameters/WinnerIdParam'
+      responses:
+        '200':
+          description: Winner removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # Applications
+  /api/apps:
+    get:
+      tags: [Applications]
+      summary: List applications
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AppSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Applications]
+      summary: Register application
+      description: Admin only
+      security:
+        - BearerAuth: []
+          AdminRole: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                manifest:
+                  $ref: '#/components/schemas/AppManifest'
+              required:
+                - manifest
+      responses:
+        '201':
+          description: Application registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AppRegistration'
+
+  /api/apps/token:
+    post:
+      tags: [Applications]
+      summary: Get application token
+      description: Exchange app credentials for access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appId:
+                  type: string
+                  example: app_lottery_v1
+                appSecret:
+                  type: string
+                  example: sk_live_abc123def456...
+              required:
+                - appId
+                - appSecret
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      tokenType:
+                        type: string
+                        example: Bearer
+                      expiresIn:
+                        type: integer
+                        example: 3600
+
+  /api/apps/{appId}:
+    get:
+      tags: [Applications]
+      summary: Get application
+      parameters:
+        - $ref: '#/components/parameters/AppIdParam'
+      responses:
+        '200':
+          description: Application details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/App'
+
+    patch:
+      tags: [Applications]
+      summary: Update application
+      description: Admin only
+      security:
+        - BearerAuth: []
+          AdminRole: []
+      parameters:
+        - $ref: '#/components/parameters/AppIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                manifest:
+                  $ref: '#/components/schemas/AppManifest'
+      responses:
+        '200':
+          description: Application updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/App'
+
+    delete:
+      tags: [Applications]
+      summary: Delete application
+      description: Admin only. Cannot delete app with active rooms
+      security:
+        - BearerAuth: []
+          AdminRole: []
+      parameters:
+        - $ref: '#/components/parameters/AppIdParam'
+      responses:
+        '200':
+          description: Application deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/apps/{appId}/regenerate-secret:
+    post:
+      tags: [Applications]
+      summary: Regenerate app secret
+      description: Admin only
+      security:
+        - BearerAuth: []
+          AdminRole: []
+      parameters:
+        - $ref: '#/components/parameters/AppIdParam'
+      responses:
+        '200':
+          description: Secret regenerated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      appId:
+                        type: string
+                      appSecret:
+                        type: string
+                      regeneratedAt:
+                        type: string
+                        format: date-time
+
+  /api/rooms/{roomId}/events:
+    post:
+      tags: [Rooms]
+      summary: Publish custom event
+      description: Application publishes custom event to room (requires realtime:publish permission)
+      parameters:
+        - $ref: '#/components/parameters/RoomIdParam'
+      security:
+        - AppToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event:
+                  type: string
+                  example: lottery:draw_started
+                  description: Event name (must start with appId prefix)
+                data:
+                  type: object
+                  additionalProperties: true
+              required:
+                - event
+                - data
+      responses:
+        '200':
+          description: Event published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: User access token
+
+    AppToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Application access token
+
+    AdminRole:
+      type: apiKey
+      in: header
+      name: X-Admin-Role
+
+  parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: usr_abc123
+
+    RoomIdParam:
+      name: roomId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: room_xyz789
+
+    ParticipantIdParam:
+      name: participantId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: part_123abc
+
+    PrizeIdParam:
+      name: prizeId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: prize_def456
+
+    WinnerIdParam:
+      name: winnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: winner_ghi789
+
+    AppIdParam:
+      name: appId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: app_lottery_v1
+
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_abc123
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        name:
+          type: string
+          example: John Doe
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - name
+        - createdAt
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - accessToken
+        - refreshToken
+        - expiresIn
+        - user
+
+    Room:
+      type: object
+      properties:
+        id:
+          type: string
+          example: room_xyz789
+        name:
+          type: string
+          example: New Year Lottery 2025
+        description:
+          type: string
+          nullable: true
+        appId:
+          type: string
+          example: app_lottery_v1
+        appSettings:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [draft, active, completed, cancelled]
+        isPublic:
+          type: boolean
+        createdBy:
+          type: string
+          example: usr_abc123
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        app:
+          $ref: '#/components/schemas/AppSummary'
+      required:
+        - id
+        - name
+        - appId
+        - status
+        - isPublic
+        - createdBy
+        - createdAt
+
+    RoomSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        appId:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, completed, cancelled]
+        isPublic:
+          type: boolean
+        participantCount:
+          type: integer
+        prizeCount:
+          type: integer
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateRoomRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        appId:
+          type: string
+        appSettings:
+          type: object
+          additionalProperties: true
+        isPublic:
+          type: boolean
+          default: true
+      required:
+        - name
+        - appId
+
+    UpdateRoomRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        appSettings:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [draft, active, completed, cancelled]
+        isPublic:
+          type: boolean
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: string
+          example: part_123abc
+        userId:
+          type: string
+          example: usr_abc123
+        roomId:
+          type: string
+          example: room_xyz789
+        role:
+          type: string
+          enum: [participant, organizer, moderator, viewer]
+        metadata:
+          type: object
+          additionalProperties: true
+        joinedAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - id
+        - userId
+        - roomId
+        - role
+        - joinedAt
+
+    Prize:
+      type: object
+      properties:
+        id:
+          type: string
+          example: prize_def456
+        roomId:
+          type: string
+          example: room_xyz789
+        name:
+          type: string
+          example: Grand Prize - iPhone 15
+        description:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+        quantityRemaining:
+          type: integer
+          minimum: 0
+        winnerCount:
+          type: integer
+          minimum: 0
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - roomId
+        - name
+        - quantity
+        - quantityRemaining
+        - createdAt
+
+    CreatePrizeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        quantity:
+          type: integer
+          minimum: 1
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+        - quantity
+
+    Winner:
+      type: object
+      properties:
+        id:
+          type: string
+          example: winner_ghi789
+        roomId:
+          type: string
+          example: room_xyz789
+        participantId:
+          type: string
+          example: part_123abc
+        prizeId:
+          type: string
+          example: prize_def456
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        participant:
+          $ref: '#/components/schemas/Participant'
+        prize:
+          $ref: '#/components/schemas/Prize'
+      required:
+        - id
+        - roomId
+        - participantId
+        - prizeId
+        - createdAt
+
+    CreateWinnerRequest:
+      type: object
+      properties:
+        participantId:
+          type: string
+          example: part_123abc
+        prizeId:
+          type: string
+          example: prize_def456
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - participantId
+        - prizeId
+
+    App:
+      type: object
+      properties:
+        appId:
+          type: string
+          example: app_lottery_v1
+        manifest:
+          $ref: '#/components/schemas/AppManifest'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - appId
+        - manifest
+        - createdAt
+
+    AppSummary:
+      type: object
+      properties:
+        appId:
+          type: string
+          example: app_lottery_v1
+        name:
+          type: string
+          example: Holiday Lottery
+        version:
+          type: string
+          example: 1.0.0
+        description:
+          type: string
+        baseUrl:
+          type: string
+          format: uri
+        capabilities:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AppManifest:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            name:
+              type: string
+            version:
+              type: string
+            description:
+              type: string
+          required:
+            - name
+            - version
+        baseUrl:
+          type: string
+          format: uri
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+              - prizeFund
+              - participantRegistration
+              - winnerSelection
+              - notifications
+              - roomSettings
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - users:read
+              - rooms:read
+              - rooms:write
+              - participants:read
+              - participants:write
+              - prizes:read
+              - prizes:write
+              - winners:read
+              - winners:write
+              - realtime:subscribe
+              - realtime:publish
+        settings:
+          type: object
+          description: JSON Schema for app settings
+          properties:
+            type:
+              type: string
+              example: object
+            properties:
+              type: object
+              additionalProperties: true
+      required:
+        - meta
+        - baseUrl
+        - permissions
+
+    AppRegistration:
+      type: object
+      properties:
+        appId:
+          type: string
+        appSecret:
+          type: string
+          description: Store securely - shown only once
+        manifest:
+          $ref: '#/components/schemas/AppManifest'
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - appId
+        - appSecret
+        - manifest
+        - createdAt
+
+    SuccessResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+        pages:
+          type: integer
+          example: 5
+      required:
+        - page
+        - limit
+        - total
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Validation failed
+            details:
+              type: object
+              additionalProperties: true
+          required:
+            - code
+            - message
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: BAD_REQUEST
+              message: Invalid request parameters
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Resource not found
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CONFLICT
+              message: Resource already exists or state conflict
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Validation failed
+              details:
+                fields:
+                  name: ["Name is required"]
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Invalid or expired token
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Insufficient permissions
+              details:
+                required: rooms:write
+                granted: [rooms:read]
