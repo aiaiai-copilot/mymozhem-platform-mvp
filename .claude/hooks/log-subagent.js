@@ -28,10 +28,38 @@ process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
 
+    // Try to find subagent_type by looking at recent Task tool calls in tools-debug.txt
+    let subagentType = 'unknown';
+    const toolsDebugFile = path.join(projectDir, '.claude', 'logs', 'tools-debug.txt');
+
+    try {
+      if (fs.existsSync(toolsDebugFile)) {
+        const toolsLog = fs.readFileSync(toolsDebugFile, 'utf8');
+        // Look for Task tool calls in the same session
+        const taskCalls = toolsLog.split('\n===').filter(entry =>
+          entry.includes(data.session_id) &&
+          entry.includes('"tool_name":"Task"') &&
+          entry.includes('subagent_type')
+        );
+
+        // Get the most recent Task call
+        if (taskCalls.length > 0) {
+          const lastCall = taskCalls[taskCalls.length - 1];
+          const match = lastCall.match(/"subagent_type":"([^"]+)"/);
+          if (match) {
+            subagentType = match[1];
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail - we'll use agent_id as fallback
+    }
+
     // Extract subagent info from the event data
     const entry = {
       ts: new Date().toISOString(),
-      agent: data.agent_id || data.subagent_name || data.subagent_type || data.agent_name || data.tool_input?.subagent_type || 'unknown',
+      agent: subagentType !== 'unknown' ? subagentType : data.agent_id,
+      agent_id: data.agent_id,
       status: data.error ? 'error' : 'completed',
       error: data.error || null,
       session: data.session_id || null,
@@ -42,7 +70,7 @@ process.stdin.on('end', () => {
     fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
 
     // Log to stderr for visibility
-    process.stderr.write(`[Subagent] ${entry.agent} - ${entry.status}\n`);
+    process.stderr.write(`[Subagent] ${entry.agent} (${entry.agent_id}) - ${entry.status}\n`);
 
   } catch (e) {
     // Log parsing errors separately
