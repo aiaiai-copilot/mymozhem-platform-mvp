@@ -47,3 +47,8 @@ prisma/generated/
 tmp/
 temp/
 *.tmp
+
+# Claude Code
+.claude/settings.local.json
+.claude/logs/*.jsonl
+.claude/logs/*.txt
