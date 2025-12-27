@@ -46,7 +46,8 @@ process.stdin.on('end', () => {
         tool_use_id: data.tool_use_id,
         subagent_type: data.tool_input.subagent_type,
         session_id: data.session_id,
-        description: data.tool_input.description
+        description: data.tool_input.description,
+        prompt: data.tool_input.prompt  // Save full prompt for better matching
       };
       fs.appendFileSync(mapFile, JSON.stringify(mapEntry) + '\n');
     }

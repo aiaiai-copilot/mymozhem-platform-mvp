@@ -75,13 +75,14 @@ process.stdin.on('end', () => {
                   }
                 }
 
-                // Strategy 1: Match by prompt content (most reliable for parallel agents)
+                // Strategy 1: Match by exact prompt
                 if (promptFromTranscript) {
                   for (const mapping of mappings) {
                     const mapKey = `${mapping.tool_use_id}:${mapping.subagent_type}`;
                     if (!usedMappings.has(mapKey) &&
                         mapping.session_id === sessionId &&
-                        promptFromTranscript.includes(mapping.description)) {
+                        mapping.prompt &&
+                        promptFromTranscript.trim() === mapping.prompt.trim()) {
                       subagentType = mapping.subagent_type;
                       matchedMapping = mapKey;
                       matched = true;
@@ -90,7 +91,7 @@ process.stdin.on('end', () => {
                   }
                 }
 
-                // Strategy 2: Match by session + first unused of each type
+                // Strategy 2: Match by session + first unused (fallback if exact match failed)
                 if (!matched) {
                   for (const mapping of mappings) {
                     const mapKey = `${mapping.tool_use_id}:${mapping.subagent_type}`;
@@ -108,17 +109,9 @@ process.stdin.on('end', () => {
             }
           }
 
-          // Strategy 3: Fallback to first unused mapping
-          if (!matched) {
-            for (const mapping of mappings) {
-              const mapKey = `${mapping.tool_use_id}:${mapping.subagent_type}`;
-              if (!usedMappings.has(mapKey)) {
-                subagentType = mapping.subagent_type;
-                matchedMapping = mapKey;
-                break;
-              }
-            }
-          }
+          // Strategy 3: Removed - no cross-session fallback
+          // Agents without proper mappings will show as hex IDs
+          // This prevents incorrect mapping consumption
 
           // Mark this mapping as used
           if (matchedMapping) {
@@ -145,7 +138,9 @@ process.stdin.on('end', () => {
     fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
 
     // Log to stderr for visibility
-    process.stderr.write(`[Subagent] ${entry.agent} (${entry.agent_id}) - ${entry.status}\n`);
+    const matchInfo = subagentType !== 'unknown' ?
+      (subagentType === data.agent_id ? '[no mapping]' : '[mapped]') : '[no mapping]';
+    process.stderr.write(`[Subagent] ${entry.agent} (${entry.agent_id}) - ${entry.status} ${matchInfo}\n`);
 
   } catch (e) {
     // Log parsing errors separately
