@@ -1,7 +1,48 @@
 {
   "hooks": {
-    "UserPromptSubmit": [],
-    "PreToolUse": [],
-    "SubagentStop": []
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/test-simple.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/log-skill-read.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/log-tool-call.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/log-subagent.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }
