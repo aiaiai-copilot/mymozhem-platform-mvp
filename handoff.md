@@ -1,73 +1,34 @@
-# Handoff: API Design Complete, Database Schema Next
+# Handoff: Logging Fixed, Database Schema Next
 
 **Date:** December 28, 2025
-**Session:** API design session
-**Previous Session:** Project setup and infrastructure
+**Session:** Bug fix session - Agent logging
+**Previous Session:** API design complete
 **Next Task:** Database schema design
 
 ---
 
 ## What Was Accomplished This Session
 
-### 1. Documentation Reorganization
-- ✅ Moved `event-platform-context.md` to `docs/` directory
-- ✅ Updated all references in `CLAUDE.md` and `handoff.md`
-- ✅ Organized documentation structure for scalability
+### 1. Fixed Agent Logging System
+- ✅ **Root cause analysis** - Identified flawed matching logic in hook scripts
+- ✅ **Exact prompt matching** - Replaced fuzzy `includes()` with exact comparison
+- ✅ **Enhanced mapping data** - Added full prompt to mapping entries
+- ✅ **Removed cross-session fallback** - Eliminated Strategy 3 to prevent pollution
+- ✅ **Improved debug output** - Added `[mapped]`/`[no mapping]` indicators
+- ✅ **Full validation** - Tested with real agents, warmup agents, and parallel agents
 
-### 2. Complete API Design
-- ✅ **7 comprehensive API documentation files** created in `docs/api/`:
-  - `README.md` - Overview and getting started guide
-  - `authentication.md` - Complete auth & authorization documentation
-  - `rest-endpoints.md` - Full REST API endpoint reference
-  - `websocket-protocol.md` - WebSocket event protocol specification
-  - `app-manifest.md` - Application manifest specification
-  - `design-decisions.md` - Architecture decisions and rationale
-  - `quick-reference.md` - Quick reference for developers
-- ✅ **OpenAPI 3.1 specification** in `docs/openapi.yaml`
+### 2. Commits Made
+- `2ef8001` - Fix subagent logging to use exact prompt matching
 
-### 3. Authentication Model Decision
-**Selected: Option D - Combination (App Key + User Context)**
+### Previous Session Deliverables (Still Valid)
 
-- **Users:** OAuth 2.0 (Google) with JWT tokens
-- **Applications:** API Key (appId + appSecret) for app identity
-- **Hybrid Operations:** Both tokens for app actions on behalf of users
-- **Benefits:** Defense in depth, audit trail, granular permissions
-
-### 4. API Design Highlights
-
-**REST API Endpoints:**
-- User Management - OAuth authentication, profile CRUD
-- Room Management - Create/update/delete with app integration
-- Participant Management - Join/leave with role-based permissions
-- Prize Management - CRUD operations for prize fund
-- Winner Management - Selection and assignment with validation
-- Application Management - Registration, manifest, token exchange
-- Function Delegation - Webhook-based platform function delegation
-
-**WebSocket Protocol:**
-- Real-time room, participant, prize, and winner events
-- Application custom events (e.g., `lottery:draw_started`)
-- Presence system for tracking online participants
-- Two-way communication with acknowledgments
-- Event naming: `entity:action` pattern (e.g., `room:updated`)
-
-**Security Features:**
-- Fine-grained permissions (e.g., `users:read`, `prizes:write`)
-- Rate limiting with tiered limits (20/100/1000 req/min)
-- Input validation with detailed error messages
-- HMAC signatures for webhook verification
-- HTTPS-only in production
-
-**Design Principles:**
-- RESTful conventions with resource-based URLs
-- Consistent response format: `{ data, error, meta }`
-- Clear error handling with structured error codes
-- Pagination with offset-based navigation
-- Filtering and sorting via query parameters
-
-### 5. Commits Made
-- `e978839` - Design complete REST API and WebSocket protocol
-- `1d4a48f` - Fix subagent logging to show semantic names for all agents
+**API Design Complete:**
+- ✅ 7 comprehensive API documentation files in `docs/api/`
+- ✅ OpenAPI 3.1 specification in `docs/openapi.yaml`
+- ✅ Authentication model: Hybrid (App Key + User Context)
+- ✅ REST endpoints for all entities
+- ✅ WebSocket protocol for real-time events
+- ✅ Security model with permissions and rate limiting
 
 ---
 
@@ -76,16 +37,16 @@
 ### Repository
 - **Branch:** master
 - **Remote:** https://github.com/aiaiai-copilot/mymozhem-platform-mvp
-- **Status:** All changes committed and pushed
-- **Total Commits:** 5
+- **Status:** Clean (1 commit ahead of origin, not yet pushed)
+- **Total Commits:** 6
 
 ### Recent Commits
 ```
+2ef8001 Fix subagent logging to use exact prompt matching
+138ddec Update handoff for next session - API design complete
+067479b refactor: move file to another directory
 e978839 Design complete REST API and WebSocket protocol
 1d4a48f Fix subagent logging to show semantic names for all agents
-6253644 Improve subagent logging and add session handoff
-05cc786 Ignore Claude Code local settings and log files
-8077af1 Add working hook-based logging system for debugging
 ```
 
 ### Project Structure
@@ -145,45 +106,31 @@ e978839 Design complete REST API and WebSocket protocol
 
 ---
 
-## Known Issues
+## Issues Resolved This Session
 
-### ⚠️ Agent Logging Issue (Non-Critical)
+### ✅ Agent Logging Issue - FIXED
 
 **Problem:**
-Some agents in `.claude/logs/subagents.jsonl` show hex IDs instead of semantic names:
+Agents were showing hex IDs instead of semantic names due to flawed matching logic in hook scripts.
 
-```json
-{"ts":"2025-12-27T13:34:16.910Z","agent":"a2d6725","agent_id":"a2d6725",...}
-{"ts":"2025-12-27T22:27:02.279Z","agent":"af61498","agent_id":"af61498",...}
-```
+**Root Cause:**
+1. Fuzzy matching using `includes()` caused incorrect consumption
+2. Cross-session fallback consumed wrong mappings
+3. Missing full prompt in mapping data
 
-Expected:
-```json
-{"ts":"2025-12-27T13:34:16.910Z","agent":"api-designer","agent_id":"a2d6725",...}
-```
+**Solution Implemented:**
+- **Exact prompt matching** - Changed from `includes(description)` to `prompt.trim() === mapping.prompt.trim()`
+- **Save full prompt** - Added `prompt` field to mapping data in `log-tool-call.js`
+- **Removed Strategy 3** - Eliminated cross-session fallback to prevent pollution
+- **Better debug output** - Added `[mapped]`/`[no mapping]` indicators to stderr
 
-**Investigation Findings:**
-- Mapping system works correctly for new Task tool calls
-- Agents showing hex IDs have NO corresponding Task calls in tools-debug.txt
-- These agents were likely:
-  1. Resumed agents (using `resume` parameter)
-  2. Started before hooks were active
-  3. Started in a different session without hooks
+**Validation:**
+- ✅ Real agents with Task calls show correct type (api-designer, schema-architect, code-reviewer, Explore)
+- ✅ Warmup agents show their type when launched via Task tool
+- ✅ Parallel agents all match correctly via exact prompt
+- ✅ Agents without Task mappings correctly show hex IDs
 
-**Current Mapping System:**
-1. `log-tool-call.js` - When Task tool called → saves mapping to `subagent-map.jsonl`
-2. `log-subagent.js` - When agent completes → finds mapping by:
-   - Strategy 1: Match prompt content in transcript
-   - Strategy 2: Match session ID + first unused
-   - Strategy 3: Fallback to oldest unused
-
-**Next Steps for Fix:**
-1. Check if agent transcripts contain subagent_type metadata
-2. Add fallback to extract type from transcript first line
-3. Consider tracking resumed agents separately
-4. Document that historical agents without mappings will show hex IDs
-
-**Priority:** Low - doesn't affect functionality, only logging readability
+**Commit:** `2ef8001` - Fix subagent logging to use exact prompt matching
 
 ---
 
