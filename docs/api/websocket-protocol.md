@@ -8,7 +8,7 @@ Real-time communication using Socket.io with room-based event broadcasting.
 
 **Transport:** WebSocket with fallback to HTTP long-polling
 
-**URL:** `wss://api.platform.example.com`
+**URL:** `wss://api.platform.example.com` (WebSocket connections are version-agnostic, but subscribe to versioned event schemas)
 
 ---
 
@@ -424,7 +424,7 @@ Applications can publish custom events to room subscribers.
 
 **Application emits via REST API:**
 ```http
-POST /api/rooms/:roomId/events
+POST /api/v1/rooms/:roomId/events
 Authorization: Bearer {appToken}
 X-App-Id: app_lottery_v1
 Content-Type: application/json
@@ -784,7 +784,7 @@ WebSocket connection uses long-lived tokens. If token expires:
 ```javascript
 socket.on('token:expired', () => {
   // Refresh token via REST API
-  fetch('/api/auth/refresh', {
+  fetch('/api/v1/auth/refresh', {
     method: 'POST',
     body: JSON.stringify({ refreshToken })
   })

@@ -4,9 +4,13 @@ Complete REST API and WebSocket protocol documentation for the Event Management 
 
 ## Quick Links
 
+- [Quick Reference](./quick-reference.md) - Fast API reference guide
 - [Authentication & Authorization](./authentication.md) - OAuth, API keys, permissions
 - [REST API Endpoints](./rest-endpoints.md) - Complete endpoint reference
 - [WebSocket Protocol](./websocket-protocol.md) - Real-time event specification
+- [API Versioning Strategy](./versioning-strategy.md) - Version management and migration
+- [Design Decisions](./design-decisions.md) - Architecture rationale
+- [App Manifest Specification](./app-manifest.md) - Application integration guide
 - [OpenAPI Specification](../openapi.yaml) - Machine-readable API spec
 
 ---
@@ -14,6 +18,12 @@ Complete REST API and WebSocket protocol documentation for the Event Management 
 ## Overview
 
 The Event Management Platform provides a headless backend for organizing celebratory events (lotteries, quizzes, tastings, contests) with unified application integration through a standard protocol.
+
+**Current API Version:** `v1`
+
+**Base URL:** `https://api.platform.example.com/api/v1`
+
+All endpoints use versioned URLs for backward compatibility. See [versioning-strategy.md](./versioning-strategy.md) for details.
 
 ### Architecture
 
@@ -123,7 +133,8 @@ See [authentication.md](./authentication.md) for complete details.
 
 ### RESTful Conventions
 
-- **Resource-based URLs** - `/api/rooms/:roomId/participants`
+- **URL Versioning** - All endpoints use `/api/v1/` prefix
+- **Resource-based URLs** - `/api/v1/rooms/:roomId/participants`
 - **HTTP methods** - GET (read), POST (create), PATCH (update), DELETE (remove)
 - **Consistent responses** - `{ data, error, meta }` structure
 - **Status codes** - 2xx success, 4xx client error, 5xx server error
@@ -157,7 +168,7 @@ See [authentication.md](./authentication.md) for complete details.
 
 All list endpoints support pagination:
 ```http
-GET /api/rooms?page=1&limit=20
+GET /api/v1/rooms?page=1&limit=20
 ```
 
 Response includes metadata:
@@ -282,7 +293,7 @@ When a room uses an app with `winnerSelection` capability, the platform delegate
 
 **Platform → App:**
 ```http
-POST {appBaseUrl}/api/platform/winner-selection
+POST {appBaseUrl}/api/v1/platform/winner-selection
 Content-Type: application/json
 X-Platform-Signature: {hmac_signature}
 
@@ -360,7 +371,7 @@ All production API calls must use HTTPS.
 
 ```javascript
 // 1. Create room
-const room = await fetch('/api/rooms', {
+const room = await fetch('/api/v1/rooms', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -378,7 +389,7 @@ const room = await fetch('/api/rooms', {
 }).then(r => r.json());
 
 // 2. Join room
-const participant = await fetch(`/api/rooms/${room.data.id}/participants`, {
+const participant = await fetch(`/api/v1/rooms/${room.data.id}/participants`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -405,7 +416,7 @@ socket.on('participant:joined', (data) => {
 
 ```javascript
 // App publishes draw started event
-await fetch(`/api/rooms/${roomId}/events`, {
+await fetch(`/api/v1/rooms/${roomId}/events`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${appToken}`,
@@ -470,7 +481,9 @@ For questions or issues:
 
 ## Changelog
 
-### v1.0.0 (2025-01-15)
+### v1.0.0 (2025-12-28)
+- **API Versioning** - All endpoints now use `/api/v1/` prefix
+- **Versioning Strategy** - Comprehensive version management and deprecation policy
 - Initial API design
 - User authentication (OAuth Google)
 - Room management
@@ -480,3 +493,5 @@ For questions or issues:
 - Application registration and manifest
 - WebSocket real-time events
 - Function delegation system
+
+See [versioning-strategy.md](./versioning-strategy.md) for migration policies and future version plans.

@@ -21,14 +21,14 @@ The platform uses a dual authentication model:
 
 #### Initiate OAuth Login
 ```http
-GET /api/auth/google
+GET /api/v1/auth/google
 ```
 
 **Response:** Redirects to Google OAuth consent screen
 
 #### OAuth Callback
 ```http
-GET /api/auth/google/callback?code={code}
+GET /api/v1/auth/google/callback?code={code}
 ```
 
 **Response:**
@@ -50,7 +50,7 @@ GET /api/auth/google/callback?code={code}
 
 #### Refresh Token
 ```http
-POST /api/auth/refresh
+POST /api/v1/auth/refresh
 Content-Type: application/json
 
 {
@@ -70,7 +70,7 @@ Content-Type: application/json
 
 #### Get Current User
 ```http
-GET /api/auth/me
+GET /api/v1/auth/me
 Authorization: Bearer {accessToken}
 ```
 
@@ -89,7 +89,7 @@ Authorization: Bearer {accessToken}
 
 #### Logout
 ```http
-POST /api/auth/logout
+POST /api/v1/auth/logout
 Authorization: Bearer {accessToken}
 ```
 
@@ -117,7 +117,7 @@ Authorization: Bearer {accessToken}
 
 #### Register Application (Admin Only)
 ```http
-POST /api/apps
+POST /api/v1/apps
 Authorization: Bearer {adminToken}
 Content-Type: application/json
 
@@ -167,7 +167,7 @@ Content-Type: application/json
 
 #### Get Application Token
 ```http
-POST /api/apps/token
+POST /api/v1/apps/token
 Content-Type: application/json
 
 {

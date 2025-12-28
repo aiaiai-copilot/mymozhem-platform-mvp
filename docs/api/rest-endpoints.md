@@ -3,8 +3,10 @@
 ## Base URL
 
 ```
-https://api.platform.example.com
+https://api.platform.example.com/api/v1
 ```
+
+All endpoints use API versioning with `/api/v1` prefix. This ensures backward compatibility and allows future API versions to coexist.
 
 ## Response Format
 
@@ -39,7 +41,7 @@ All endpoints return JSON with consistent structure:
 
 ### Get User Profile
 ```http
-GET /api/users/:userId
+GET /api/v1/users/:userId
 Authorization: Bearer {token}
 ```
 
@@ -59,7 +61,7 @@ Authorization: Bearer {token}
 
 ### Update User Profile
 ```http
-PATCH /api/users/:userId
+PATCH /api/v1/users/:userId
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -73,7 +75,7 @@ Content-Type: application/json
 
 ### Delete User
 ```http
-DELETE /api/users/:userId
+DELETE /api/v1/users/:userId
 Authorization: Bearer {token}
 ```
 
@@ -92,7 +94,7 @@ Authorization: Bearer {token}
 
 ### Create Room
 ```http
-POST /api/rooms
+POST /api/v1/rooms
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -133,7 +135,7 @@ Content-Type: application/json
 
 ### List Rooms
 ```http
-GET /api/rooms?page=1&limit=20&status=active&appId=app_lottery_v1
+GET /api/v1/rooms?page=1&limit=20&status=active&appId=app_lottery_v1
 Authorization: Bearer {token}
 ```
 
@@ -172,7 +174,7 @@ Authorization: Bearer {token}
 
 ### Get Room Details
 ```http
-GET /api/rooms/:roomId
+GET /api/v1/rooms/:roomId
 Authorization: Bearer {token}
 ```
 
@@ -205,7 +207,7 @@ Authorization: Bearer {token}
 
 ### Update Room
 ```http
-PATCH /api/rooms/:roomId
+PATCH /api/v1/rooms/:roomId
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -225,7 +227,7 @@ Content-Type: application/json
 
 ### Delete Room
 ```http
-DELETE /api/rooms/:roomId
+DELETE /api/v1/rooms/:roomId
 Authorization: Bearer {token}
 ```
 
@@ -246,7 +248,7 @@ Authorization: Bearer {token}
 
 ### Join Room
 ```http
-POST /api/rooms/:roomId/participants
+POST /api/v1/rooms/:roomId/participants
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -287,7 +289,7 @@ Content-Type: application/json
 
 ### List Participants
 ```http
-GET /api/rooms/:roomId/participants?page=1&limit=50&role=participant
+GET /api/v1/rooms/:roomId/participants?page=1&limit=50&role=participant
 Authorization: Bearer {token}
 ```
 
@@ -325,7 +327,7 @@ Authorization: Bearer {token}
 
 ### Get Participant
 ```http
-GET /api/rooms/:roomId/participants/:participantId
+GET /api/v1/rooms/:roomId/participants/:participantId
 Authorization: Bearer {token}
 ```
 
@@ -333,7 +335,7 @@ Authorization: Bearer {token}
 
 ### Update Participant
 ```http
-PATCH /api/rooms/:roomId/participants/:participantId
+PATCH /api/v1/rooms/:roomId/participants/:participantId
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -351,7 +353,7 @@ Content-Type: application/json
 
 ### Remove Participant
 ```http
-DELETE /api/rooms/:roomId/participants/:participantId
+DELETE /api/v1/rooms/:roomId/participants/:participantId
 Authorization: Bearer {token}
 ```
 
@@ -372,7 +374,7 @@ Authorization: Bearer {token}
 
 ### Create Prize
 ```http
-POST /api/rooms/:roomId/prizes
+POST /api/v1/rooms/:roomId/prizes
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -412,7 +414,7 @@ Content-Type: application/json
 
 ### List Prizes
 ```http
-GET /api/rooms/:roomId/prizes?page=1&limit=50
+GET /api/v1/rooms/:roomId/prizes?page=1&limit=50
 Authorization: Bearer {token}
 ```
 
@@ -442,7 +444,7 @@ Authorization: Bearer {token}
 
 ### Get Prize
 ```http
-GET /api/rooms/:roomId/prizes/:prizeId
+GET /api/v1/rooms/:roomId/prizes/:prizeId
 Authorization: Bearer {token}
 ```
 
@@ -450,7 +452,7 @@ Authorization: Bearer {token}
 
 ### Update Prize
 ```http
-PATCH /api/rooms/:roomId/prizes/:prizeId
+PATCH /api/v1/rooms/:roomId/prizes/:prizeId
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -466,7 +468,7 @@ Content-Type: application/json
 
 ### Delete Prize
 ```http
-DELETE /api/rooms/:roomId/prizes/:prizeId
+DELETE /api/v1/rooms/:roomId/prizes/:prizeId
 Authorization: Bearer {token}
 ```
 
@@ -489,7 +491,7 @@ Authorization: Bearer {token}
 
 ### Select Winner
 ```http
-POST /api/rooms/:roomId/winners
+POST /api/v1/rooms/:roomId/winners
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -541,7 +543,7 @@ Content-Type: application/json
 
 ### List Winners
 ```http
-GET /api/rooms/:roomId/winners?page=1&limit=50&prizeId=prize_def456
+GET /api/v1/rooms/:roomId/winners?page=1&limit=50&prizeId=prize_def456
 Authorization: Bearer {token}
 ```
 
@@ -586,7 +588,7 @@ Authorization: Bearer {token}
 
 ### Get Winner
 ```http
-GET /api/rooms/:roomId/winners/:winnerId
+GET /api/v1/rooms/:roomId/winners/:winnerId
 Authorization: Bearer {token}
 ```
 
@@ -594,7 +596,7 @@ Authorization: Bearer {token}
 
 ### Delete Winner
 ```http
-DELETE /api/rooms/:roomId/winners/:winnerId
+DELETE /api/v1/rooms/:roomId/winners/:winnerId
 Authorization: Bearer {token}
 ```
 
@@ -615,7 +617,7 @@ Authorization: Bearer {token}
 
 ### Register Application (Admin Only)
 ```http
-POST /api/apps
+POST /api/v1/apps
 Authorization: Bearer {adminToken}
 Content-Type: application/json
 
@@ -638,7 +640,7 @@ Content-Type: application/json
 
 ### List Applications
 ```http
-GET /api/apps?page=1&limit=20
+GET /api/v1/apps?page=1&limit=20
 Authorization: Bearer {token}
 ```
 
@@ -666,7 +668,7 @@ Authorization: Bearer {token}
 
 ### Get Application
 ```http
-GET /api/apps/:appId
+GET /api/v1/apps/:appId
 Authorization: Bearer {token}
 ```
 
@@ -703,7 +705,7 @@ Authorization: Bearer {token}
 
 ### Update Application (Admin Only)
 ```http
-PATCH /api/apps/:appId
+PATCH /api/v1/apps/:appId
 Authorization: Bearer {adminToken}
 Content-Type: application/json
 
@@ -716,7 +718,7 @@ Content-Type: application/json
 
 ### Regenerate App Secret (Admin Only)
 ```http
-POST /api/apps/:appId/regenerate-secret
+POST /api/v1/apps/:appId/regenerate-secret
 Authorization: Bearer {adminToken}
 ```
 
@@ -733,7 +735,7 @@ Authorization: Bearer {adminToken}
 
 ### Delete Application (Admin Only)
 ```http
-DELETE /api/apps/:appId
+DELETE /api/v1/apps/:appId
 Authorization: Bearer {adminToken}
 ```
 
@@ -759,7 +761,7 @@ When room uses app with `winnerSelection` capability:
 
 **Platform calls app webhook:**
 ```http
-POST {appBaseUrl}/api/platform/winner-selection
+POST {appBaseUrl}/api/v1/platform/winner-selection
 Content-Type: application/json
 X-Platform-Signature: {hmac_signature}
 
@@ -879,13 +881,13 @@ All list endpoints support pagination:
 ### Filtering
 Query parameters match field names:
 ```http
-GET /api/rooms?status=active&isPublic=true&appId=app_lottery_v1
+GET /api/v1/rooms?status=active&isPublic=true&appId=app_lottery_v1
 ```
 
 ### Sorting
 Use `sort` parameter:
 ```http
-GET /api/rooms?sort=-createdAt,name
+GET /api/v1/rooms?sort=-createdAt,name
 ```
 
 - Prefix with `-` for descending
@@ -898,7 +900,7 @@ GET /api/rooms?sort=-createdAt,name
 Reduce response size by selecting specific fields:
 
 ```http
-GET /api/rooms/:roomId?fields=id,name,status,participantCount
+GET /api/v1/rooms/:roomId?fields=id,name,status,participantCount
 ```
 
 **Response:**

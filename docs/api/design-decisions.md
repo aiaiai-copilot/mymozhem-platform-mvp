@@ -458,26 +458,68 @@ fastify.post('/api/rooms', {
 
 ## API Versioning Strategy
 
-### URL-Based Versioning (Future)
+### URL-Based Versioning
 
-**Current:** No versioning (v1 implicit)
+**Current:** Version 1 (v1) - All endpoints prefixed with `/api/v1/`
 
-**Future Plan:**
+**Pattern:**
 ```
 /api/v1/rooms
-/api/v2/rooms
+/api/v1/users
+/api/v1/apps
 ```
 
 **Rationale:**
-- Clear version in URL
+- Clear version in URL from day one
+- Enables future versions without breaking existing integrations
 - Can run multiple versions simultaneously
 - Easy to deprecate old versions
-- Standard practice
+- Standard practice in production APIs
+- Prevents breaking changes for third-party developers
 
-**For MVP:**
-- Single version
-- Breaking changes require major version bump
-- Maintain backward compatibility where possible
+**Versioning Strategy:**
+
+1. **Major Version (v1, v2, v3)**
+   - Breaking changes to request/response structure
+   - Removed endpoints or fields
+   - Changed authentication model
+   - Incompatible behavior changes
+
+2. **Minor Changes (No Version Change)**
+   - New optional fields in responses
+   - New endpoints
+   - New query parameters (optional)
+   - Bug fixes
+
+3. **Deprecation Policy**
+   - Minimum 6 months notice before deprecating version
+   - Version support: Current + previous major version
+   - Deprecation warnings in response headers
+   - Migration guide provided
+
+4. **Version in Headers (Alternative)**
+   - Accept version via `Accept: application/vnd.platform.v1+json`
+   - Currently not used, but reserved for future flexibility
+
+**Current Implementation:**
+- v1 is the initial and only version
+- All new endpoints must use `/api/v1/` prefix
+- Future versions will coexist: `/api/v1/`, `/api/v2/`
+- WebSocket connections also versioned (optional namespace)
+
+**When to Bump Version:**
+- Remove required field from request
+- Change field type or format
+- Remove endpoint
+- Change authentication mechanism
+- Change error response structure
+- Rename resources or endpoints
+
+**Backward Compatibility:**
+- Add new fields (always optional)
+- Add new endpoints
+- Add new query parameters (optional)
+- Deprecate (but not remove) old fields with notice
 
 ---
 

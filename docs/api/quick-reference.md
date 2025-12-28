@@ -3,8 +3,10 @@
 ## Base URL
 
 ```
-https://api.platform.example.com
+https://api.platform.example.com/api/v1
 ```
+
+All endpoints are versioned with `/api/v1` prefix for backward compatibility.
 
 ---
 
@@ -13,7 +15,7 @@ https://api.platform.example.com
 ### User Login (OAuth Google)
 
 ```http
-GET /api/auth/google
+GET /api/v1/auth/google
 ```
 
 Redirects to Google OAuth, returns to callback with token.
@@ -45,10 +47,10 @@ Authorization: Bearer {accessToken}
 
 ```http
 # List rooms
-GET /api/rooms?page=1&limit=20&status=active
+GET /api/v1/rooms?page=1&limit=20&status=active
 
 # Create room
-POST /api/rooms
+POST /api/v1/rooms
 {
   "name": "New Year Lottery 2025",
   "appId": "app_lottery_v1",
@@ -56,70 +58,70 @@ POST /api/rooms
 }
 
 # Get room
-GET /api/rooms/{roomId}
+GET /api/v1/rooms/{roomId}
 
 # Update room
-PATCH /api/rooms/{roomId}
+PATCH /api/v1/rooms/{roomId}
 { "status": "active" }
 
 # Delete room
-DELETE /api/rooms/{roomId}
+DELETE /api/v1/rooms/{roomId}
 ```
 
 ### Participants
 
 ```http
 # Join room
-POST /api/rooms/{roomId}/participants
+POST /api/v1/rooms/{roomId}/participants
 { "role": "participant" }
 
 # List participants
-GET /api/rooms/{roomId}/participants
+GET /api/v1/rooms/{roomId}/participants
 
 # Update participant
-PATCH /api/rooms/{roomId}/participants/{participantId}
+PATCH /api/v1/rooms/{roomId}/participants/{participantId}
 { "role": "moderator" }
 
 # Remove participant
-DELETE /api/rooms/{roomId}/participants/{participantId}
+DELETE /api/v1/rooms/{roomId}/participants/{participantId}
 ```
 
 ### Prizes
 
 ```http
 # Create prize
-POST /api/rooms/{roomId}/prizes
+POST /api/v1/rooms/{roomId}/prizes
 {
   "name": "iPhone 15",
   "quantity": 1
 }
 
 # List prizes
-GET /api/rooms/{roomId}/prizes
+GET /api/v1/rooms/{roomId}/prizes
 
 # Update prize
-PATCH /api/rooms/{roomId}/prizes/{prizeId}
+PATCH /api/v1/rooms/{roomId}/prizes/{prizeId}
 { "quantity": 2 }
 
 # Delete prize
-DELETE /api/rooms/{roomId}/prizes/{prizeId}
+DELETE /api/v1/rooms/{roomId}/prizes/{prizeId}
 ```
 
 ### Winners
 
 ```http
 # Select winner
-POST /api/rooms/{roomId}/winners
+POST /api/v1/rooms/{roomId}/winners
 {
   "participantId": "part_123abc",
   "prizeId": "prize_def456"
 }
 
 # List winners
-GET /api/rooms/{roomId}/winners
+GET /api/v1/rooms/{roomId}/winners
 
 # Remove winner
-DELETE /api/rooms/{roomId}/winners/{winnerId}
+DELETE /api/v1/rooms/{roomId}/winners/{winnerId}
 ```
 
 ---
@@ -277,7 +279,7 @@ socket.on('room:status_changed', (data) => {
 ## Pagination
 
 ```http
-GET /api/rooms?page=1&limit=20
+GET /api/v1/rooms?page=1&limit=20
 ```
 
 **Parameters:**
@@ -303,16 +305,16 @@ GET /api/rooms?page=1&limit=20
 
 ```http
 # Filter by status
-GET /api/rooms?status=active
+GET /api/v1/rooms?status=active
 
 # Filter by app
-GET /api/rooms?appId=app_lottery_v1
+GET /api/v1/rooms?appId=app_lottery_v1
 
 # Filter by public/private
-GET /api/rooms?isPublic=true
+GET /api/v1/rooms?isPublic=true
 
 # Multiple filters
-GET /api/rooms?status=active&isPublic=true&page=1&limit=50
+GET /api/v1/rooms?status=active&isPublic=true&page=1&limit=50
 ```
 
 ---
@@ -339,7 +341,7 @@ X-RateLimit-Reset: 1704448800
 ### 1. Register App (Admin)
 
 ```http
-POST /api/apps
+POST /api/v1/apps
 Authorization: Bearer {adminToken}
 
 {
@@ -361,7 +363,7 @@ Response:
 ### 2. Get App Token
 
 ```http
-POST /api/apps/token
+POST /api/v1/apps/token
 
 {
   "appId": "app_lottery_v1",
@@ -383,7 +385,7 @@ Response:
 
 **App acting on behalf of user:**
 ```http
-POST /api/rooms/{roomId}/prizes
+POST /api/v1/rooms/{roomId}/prizes
 Authorization: Bearer {userToken}
 X-App-Token: {appToken}
 X-App-Id: app_lottery_v1
@@ -393,7 +395,7 @@ X-App-Id: app_lottery_v1
 
 **App system operation:**
 ```http
-POST /api/rooms/{roomId}/events
+POST /api/v1/rooms/{roomId}/events
 Authorization: Bearer {appToken}
 X-App-Id: app_lottery_v1
 
@@ -411,13 +413,13 @@ X-App-Id: app_lottery_v1
 
 ```javascript
 // 1. Authenticate user
-window.location.href = 'https://api.platform.example.com/api/auth/google';
+window.location.href = 'https://api.platform.example.com/api/v1/auth/google';
 // (redirects back with token)
 
 const userToken = 'eyJhbGciOiJIUzI1NiIs...';
 
 // 2. Create room
-const room = await fetch('https://api.platform.example.com/api/rooms', {
+const room = await fetch('https://api.platform.example.com/api/v1/rooms', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -437,7 +439,7 @@ const room = await fetch('https://api.platform.example.com/api/rooms', {
 const roomId = room.data.id;
 
 // 3. Add prizes
-await fetch(`https://api.platform.example.com/api/rooms/${roomId}/prizes`, {
+await fetch(`https://api.platform.example.com/api/v1/rooms/${roomId}/prizes`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -450,7 +452,7 @@ await fetch(`https://api.platform.example.com/api/rooms/${roomId}/prizes`, {
 });
 
 // 4. Join as participant
-await fetch(`https://api.platform.example.com/api/rooms/${roomId}/participants`, {
+await fetch(`https://api.platform.example.com/api/v1/rooms/${roomId}/participants`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -480,7 +482,7 @@ socket.on('winner:selected', (data) => {
 });
 
 // 6. Activate room
-await fetch(`https://api.platform.example.com/api/rooms/${roomId}`, {
+await fetch(`https://api.platform.example.com/api/v1/rooms/${roomId}`, {
   method: 'PATCH',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -493,11 +495,11 @@ await fetch(`https://api.platform.example.com/api/rooms/${roomId}`, {
 
 // 7. Draw winner (manually or via app delegation)
 const participants = await fetch(
-  `https://api.platform.example.com/api/rooms/${roomId}/participants`
+  `https://api.platform.example.com/api/v1/rooms/${roomId}/participants`
 ).then(r => r.json());
 
 const prizes = await fetch(
-  `https://api.platform.example.com/api/rooms/${roomId}/prizes`
+  `https://api.platform.example.com/api/v1/rooms/${roomId}/prizes`
 ).then(r => r.json());
 
 const randomParticipant = participants.data[
@@ -505,7 +507,7 @@ const randomParticipant = participants.data[
 ];
 const randomPrize = prizes.data[0];
 
-await fetch(`https://api.platform.example.com/api/rooms/${roomId}/winners`, {
+await fetch(`https://api.platform.example.com/api/v1/rooms/${roomId}/winners`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userToken}`,
@@ -527,7 +529,7 @@ await fetch(`https://api.platform.example.com/api/rooms/${roomId}/winners`, {
 ### Create Room
 
 ```bash
-curl -X POST https://api.platform.example.com/api/rooms \
+curl -X POST https://api.platform.example.com/api/v1/rooms \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -540,14 +542,14 @@ curl -X POST https://api.platform.example.com/api/rooms \
 ### List Rooms
 
 ```bash
-curl https://api.platform.example.com/api/rooms?page=1&limit=10 \
+curl https://api.platform.example.com/api/v1/rooms?page=1&limit=10 \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ### Join Room
 
 ```bash
-curl -X POST https://api.platform.example.com/api/rooms/room_xyz789/participants \
+curl -X POST https://api.platform.example.com/api/v1/rooms/room_xyz789/participants \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"role": "participant"}'

@@ -28,11 +28,11 @@ info:
     name: Proprietary
 
 servers:
-  - url: https://api.platform.example.com
+  - url: https://api.platform.example.com/api/v1
     description: Production server
-  - url: https://staging-api.platform.example.com
+  - url: https://staging-api.platform.example.com/api/v1
     description: Staging server
-  - url: http://localhost:3000
+  - url: http://localhost:3000/api/v1
     description: Local development
 
 tags:
@@ -56,7 +56,7 @@ security:
 
 paths:
   # Authentication
-  /api/auth/google:
+  /auth/google:
     get:
       tags: [Authentication]
       summary: Initiate Google OAuth login
@@ -71,7 +71,7 @@ paths:
                 type: string
                 example: https://accounts.google.com/o/oauth2/v2/auth?...
 
-  /api/auth/google/callback:
+  /auth/google/callback:
     get:
       tags: [Authentication]
       summary: OAuth callback endpoint
@@ -95,7 +95,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/AuthTokenResponse'
 
-  /api/auth/refresh:
+  /auth/refresh:
     post:
       tags: [Authentication]
       summary: Refresh access token
@@ -127,7 +127,7 @@ paths:
                         type: integer
                         example: 3600
 
-  /api/auth/me:
+  /auth/me:
     get:
       tags: [Authentication]
       summary: Get current authenticated user
@@ -142,7 +142,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/User'
 
-  /api/auth/logout:
+  /auth/logout:
     post:
       tags: [Authentication]
       summary: Logout current user
@@ -155,7 +155,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
 
   # Users
-  /api/users/{userId}:
+  /users/{userId}:
     get:
       tags: [Users]
       summary: Get user profile
@@ -220,7 +220,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
 
   # Rooms
-  /api/rooms:
+  /rooms:
     get:
       tags: [Rooms]
       summary: List rooms
@@ -283,7 +283,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
-  /api/rooms/{roomId}:
+  /rooms/{roomId}:
     get:
       tags: [Rooms]
       summary: Get room details
@@ -338,7 +338,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
 
   # Participants
-  /api/rooms/{roomId}/participants:
+  /rooms/{roomId}/participants:
     get:
       tags: [Participants]
       summary: List participants
@@ -401,7 +401,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
-  /api/rooms/{roomId}/participants/{participantId}:
+  /rooms/{roomId}/participants/{participantId}:
     get:
       tags: [Participants]
       summary: Get participant
@@ -466,7 +466,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
 
   # Prizes
-  /api/rooms/{roomId}/prizes:
+  /rooms/{roomId}/prizes:
     get:
       tags: [Prizes]
       summary: List prizes
@@ -512,7 +512,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/Prize'
 
-  /api/rooms/{roomId}/prizes/{prizeId}:
+  /rooms/{roomId}/prizes/{prizeId}:
     get:
       tags: [Prizes]
       summary: Get prize
@@ -585,7 +585,7 @@ paths:
           $ref: '#/components/responses/Conflict'
 
   # Winners
-  /api/rooms/{roomId}/winners:
+  /rooms/{roomId}/winners:
     get:
       tags: [Winners]
       summary: List winners
@@ -641,7 +641,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/rooms/{roomId}/winners/{winnerId}:
+  /rooms/{roomId}/winners/{winnerId}:
     get:
       tags: [Winners]
       summary: Get winner
@@ -675,7 +675,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
 
   # Applications
-  /api/apps:
+  /apps:
     get:
       tags: [Applications]
       summary: List applications
@@ -726,7 +726,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/AppRegistration'
 
-  /api/apps/token:
+  /apps/token:
     post:
       tags: [Applications]
       summary: Get application token
@@ -768,7 +768,7 @@ paths:
                         type: integer
                         example: 3600
 
-  /api/apps/{appId}:
+  /apps/{appId}:
     get:
       tags: [Applications]
       summary: Get application
@@ -831,7 +831,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
 
-  /api/apps/{appId}/regenerate-secret:
+  /apps/{appId}/regenerate-secret:
     post:
       tags: [Applications]
       summary: Regenerate app secret
@@ -860,7 +860,7 @@ paths:
                         type: string
                         format: date-time
 
-  /api/rooms/{roomId}/events:
+  /rooms/{roomId}/events:
     post:
       tags: [Rooms]
       summary: Publish custom event
