@@ -1,0 +1,242 @@
+// Event Management Platform - Prisma Schema
+// Database: PostgreSQL
+// Generated: 2025-12-28
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id     String  @id @default(cuid())
+  email  String  @unique
+  name   String?
+  avatar String?
+
+  // OAuth provider data
+  provider      String    @default("google") // google, yandex, vk, email
+  providerId    String? // External provider user ID
+  emailVerified DateTime?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  participations Participant[]
+  createdRooms   Room[]        @relation("RoomOrganizer")
+  sessions       Session[]
+
+  @@unique([provider, providerId])
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  accessToken  String   @unique
+  refreshToken String   @unique
+  expiresAt    DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([accessToken])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ============================================================================
+// APPLICATIONS
+// ============================================================================
+
+model App {
+  id        String @id @default(cuid())
+  appId     String @unique // app_lottery_v1
+  appSecret String @unique // sk_live_abc123...
+
+  // Manifest stored as JSON
+  manifest Json
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  rooms Room[]
+
+  @@index([appId])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("apps")
+}
+
+// ============================================================================
+// ROOMS & EVENTS
+// ============================================================================
+
+enum RoomStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Room {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // Application integration
+  appId       String
+  appSettings Json // Application-specific settings validated against app manifest
+
+  // Status & visibility
+  status   RoomStatus @default(DRAFT)
+  isPublic Boolean    @default(true)
+
+  // Organizer
+  createdBy String
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  app          App           @relation(fields: [appId], references: [appId], onDelete: Restrict)
+  organizer    User          @relation("RoomOrganizer", fields: [createdBy], references: [id], onDelete: Restrict)
+  participants Participant[]
+  prizes       Prize[]
+  winners      Winner[]
+
+  @@index([appId])
+  @@index([status])
+  @@index([isPublic])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([status, isPublic, appId]) // Composite index for common queries
+  @@map("rooms")
+}
+
+// ============================================================================
+// PARTICIPANTS
+// ============================================================================
+
+enum ParticipantRole {
+  ADMIN
+  ORGANIZER
+  MODERATOR
+  PARTICIPANT
+  VIEWER
+}
+
+model Participant {
+  id     String          @id @default(cuid())
+  userId String
+  roomId String
+  role   ParticipantRole @default(PARTICIPANT)
+
+  // Application-specific metadata (e.g., ticketNumber, score, etc.)
+  metadata Json?
+
+  // Timestamps
+  joinedAt  DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete (user left room)
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room    Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  winners Winner[]
+
+  @@unique([userId, roomId]) // User can only join room once
+  @@index([roomId])
+  @@index([userId])
+  @@index([role])
+  @@index([deletedAt])
+  @@index([roomId, role]) // Common query pattern
+  @@map("participants")
+}
+
+// ============================================================================
+// PRIZES
+// ============================================================================
+
+model Prize {
+  id          String  @id @default(cuid())
+  roomId      String
+  name        String
+  description String?
+  imageUrl    String?
+
+  // Quantity tracking
+  quantity          Int @default(1)
+  quantityRemaining Int @default(1)
+
+  // Application-specific metadata (e.g., value, sponsor, category)
+  metadata Json?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  room    Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  winners Winner[]
+
+  @@index([roomId])
+  @@index([deletedAt])
+  @@map("prizes")
+}
+
+// ============================================================================
+// WINNERS
+// ============================================================================
+
+model Winner {
+  id            String @id @default(cuid())
+  roomId        String
+  participantId String
+  prizeId       String
+
+  // Application-specific metadata (e.g., drawNumber, timestamp, algorithm)
+  metadata Json?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // Soft delete (winner revoked)
+
+  // Relations
+  room        Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  prize       Prize       @relation(fields: [prizeId], references: [id], onDelete: Restrict)
+
+  @@index([roomId])
+  @@index([participantId])
+  @@index([prizeId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([roomId, prizeId]) // Common query pattern
+  @@map("winners")
+}

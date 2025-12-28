@@ -1,0 +1,177 @@
+name: Validate Database Schema
+
+on:
+  push:
+    branches: [master, main, develop]
+    paths:
+      - 'platform/prisma/schema.prisma'
+      - 'platform/scripts/validate-schema.ts'
+      - 'platform/prisma/schema.test.ts'
+      - '.github/workflows/validate-schema.yml'
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - 'platform/prisma/schema.prisma'
+      - 'platform/scripts/validate-schema.ts'
+      - 'platform/prisma/schema.test.ts'
+
+jobs:
+  validate:
+    name: Schema Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: ./platform
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Prisma schema syntax
+        working-directory: ./platform
+        run: DATABASE_URL="postgresql://user:pass@localhost:5432/test" pnpm prisma:validate
+
+      - name: Format check Prisma schema
+        working-directory: ./platform
+        run: |
+          pnpm prisma:format
+          git diff --exit-code prisma/schema.prisma || (echo "Schema is not formatted. Run 'pnpm prisma:format'" && exit 1)
+
+      - name: Generate Prisma Client
+        working-directory: ./platform
+        run: pnpm prisma:generate
+
+      - name: Run automated validation script
+        working-directory: ./platform
+        run: tsx scripts/validate-schema.ts
+
+      - name: Run schema validation tests
+        working-directory: ./platform
+        run: pnpm test prisma/schema.test.ts
+
+  api-compatibility:
+    name: API Compatibility Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        working-directory: ./platform
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        working-directory: ./platform
+        run: pnpm prisma:generate
+
+      - name: TypeScript type check
+        working-directory: ./platform
+        run: pnpm type-check
+
+  migration-test:
+    name: Test Database Migration
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        working-directory: ./platform
+        run: pnpm install --frozen-lockfile
+
+      - name: Run database migration
+        working-directory: ./platform
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+        run: pnpm prisma migrate deploy
+
+      - name: Seed database
+        working-directory: ./platform
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+        run: pnpm db:seed
+
+      - name: Verify database structure
+        working-directory: ./platform
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+        run: |
+          # Check tables exist
+          pnpm tsx -e "
+          import { PrismaClient } from '@prisma/client';
+          const prisma = new PrismaClient();
+          async function verify() {
+            const users = await prisma.user.count();
+            const rooms = await prisma.room.count();
+            const apps = await prisma.app.count();
+            console.log(\`✅ Users: \${users}, Rooms: \${rooms}, Apps: \${apps}\`);
+            if (users === 0 || rooms === 0 || apps === 0) {
+              console.error('❌ Database not seeded correctly');
+              process.exit(1);
+            }
+            await prisma.\$disconnect();
+          }
+          verify();
+          "
