@@ -45,9 +45,13 @@ model User {
 model Session {
   id           String   @id @default(cuid())
   userId       String
-  accessToken  String   @unique
   refreshToken String   @unique
   expiresAt    DateTime
+
+  // Session metadata for security tracking
+  deviceInfo String? // User agent or device description
+  ipAddress  String? // IP address of session creation
+  lastUsedAt DateTime @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -55,9 +59,29 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([accessToken])
+  @@index([refreshToken])
   @@index([expiresAt])
+  @@index([lastUsedAt]) // For cleaning up stale sessions
   @@map("sessions")
+}
+
+model TokenBlacklist {
+  id String @id @default(cuid())
+
+  // Store hash of revoked access token (not the token itself)
+  tokenHash String   @unique
+  expiresAt DateTime
+
+  // Revocation metadata
+  userId    String
+  reason    String? // logout, security_breach, manual_revoke, etc.
+  revokedAt DateTime @default(now())
+  revokedBy String? // Admin ID if manually revoked
+
+  @@index([tokenHash]) // Fast lookup for validation
+  @@index([expiresAt]) // For automatic cleanup of expired entries
+  @@index([userId]) // Track user's revoked tokens
+  @@map("token_blacklist")
 }
 
 // ============================================================================

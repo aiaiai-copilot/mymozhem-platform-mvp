@@ -88,25 +88,28 @@ const users = await prisma.user.findMany({
 
 ## Session Queries
 
-### Create Session
+### Create Session (on login)
 
 ```typescript
 const session = await prisma.session.create({
   data: {
     userId: 'usr_abc123',
-    accessToken: 'generated_access_token',
     refreshToken: 'generated_refresh_token',
-    expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+    expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000), // 30 days
+    deviceInfo: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)...',
+    ipAddress: '192.168.1.1',
   },
 });
+
+// Note: Access token is generated as JWT but NOT stored in database
 ```
 
-### Validate Access Token
+### Validate Refresh Token
 
 ```typescript
 const session = await prisma.session.findFirst({
   where: {
-    accessToken: 'token_value',
+    refreshToken: 'token_value',
     expiresAt: {
       gt: new Date(), // Greater than current time
     },
@@ -115,14 +118,70 @@ const session = await prisma.session.findFirst({
     user: true,
   },
 });
+
+// Update last used timestamp
+if (session) {
+  await prisma.session.update({
+    where: { id: session.id },
+    data: { lastUsedAt: new Date() },
+  });
+}
+```
+
+### Rotate Refresh Token
+
+```typescript
+// Generate new refresh token and update session
+const updatedSession = await prisma.session.update({
+  where: { id: 'session_id' },
+  data: {
+    refreshToken: 'new_generated_refresh_token',
+    expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000), // 30 days
+    lastUsedAt: new Date(),
+  },
+});
+
+// Return new access token (JWT) and new refresh token
 ```
 
 ### Delete Session (Logout)
 
 ```typescript
+import crypto from 'crypto';
+
+// 1. Add access token to blacklist
+const tokenHash = crypto
+  .createHash('sha256')
+  .update(accessToken)
+  .digest('hex');
+
+await prisma.tokenBlacklist.create({
+  data: {
+    tokenHash,
+    userId: 'usr_abc123',
+    expiresAt: new Date(Date.now() + 3600 * 1000), // Match access token expiry
+    reason: 'logout',
+  },
+});
+
+// 2. Delete session (refresh token)
 await prisma.session.delete({
+  where: { refreshToken: 'refresh_token_value' },
+});
+```
+
+### Get User's Active Sessions
+
+```typescript
+const sessions = await prisma.session.findMany({
   where: {
-    accessToken: 'token_value',
+    userId: 'usr_abc123',
+    expiresAt: {
+      gt: new Date(),
+    },
+  },
+  orderBy: {
+    lastUsedAt: 'desc',
   },
 });
 ```
@@ -136,6 +195,102 @@ await prisma.session.deleteMany({
       lt: new Date(),
     },
   },
+});
+```
+
+### Cleanup Stale Sessions (not used in 90 days)
+
+```typescript
+const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000);
+
+await prisma.session.deleteMany({
+  where: {
+    lastUsedAt: {
+      lt: ninetyDaysAgo,
+    },
+  },
+});
+```
+
+## Token Blacklist Queries
+
+### Check if Access Token is Revoked
+
+```typescript
+import crypto from 'crypto';
+
+// Hash the access token
+const tokenHash = crypto
+  .createHash('sha256')
+  .update(accessToken)
+  .digest('hex');
+
+// Check blacklist
+const blacklisted = await prisma.tokenBlacklist.findUnique({
+  where: { tokenHash },
+});
+
+const isRevoked = blacklisted !== null;
+```
+
+### Revoke Access Token (Security Breach)
+
+```typescript
+import crypto from 'crypto';
+
+const tokenHash = crypto
+  .createHash('sha256')
+  .update(accessToken)
+  .digest('hex');
+
+await prisma.tokenBlacklist.create({
+  data: {
+    tokenHash,
+    userId: 'usr_abc123',
+    expiresAt: new Date(Date.now() + 3600 * 1000), // Match token expiry
+    reason: 'security_breach',
+    revokedBy: 'admin_user_id',
+  },
+});
+```
+
+### Revoke All User Tokens (Admin Action)
+
+```typescript
+import crypto from 'crypto';
+
+// Get all user's active sessions
+const sessions = await prisma.session.findMany({
+  where: { userId: 'usr_abc123' },
+});
+
+// Delete all sessions
+await prisma.session.deleteMany({
+  where: { userId: 'usr_abc123' },
+});
+
+// Note: Access tokens will naturally expire (1 hour TTL)
+// If immediate revocation needed, add them to blacklist
+```
+
+### Cleanup Expired Blacklist Entries
+
+```typescript
+await prisma.tokenBlacklist.deleteMany({
+  where: {
+    expiresAt: {
+      lt: new Date(),
+    },
+  },
+});
+```
+
+### Get User's Revoked Tokens (Audit)
+
+```typescript
+const revokedTokens = await prisma.tokenBlacklist.findMany({
+  where: { userId: 'usr_abc123' },
+  orderBy: { revokedAt: 'desc' },
 });
 ```
 
