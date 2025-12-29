@@ -306,6 +306,115 @@ Verify:
 - Database exists
 - User has appropriate permissions
 
+## Manifest Versioning Migration
+
+### Adding Versioning Fields
+
+**Migration Name:** `add_manifest_versioning`
+
+**Changes:**
+1. Add `manifestVersion` field to `apps` table (String, required)
+2. Add `manifestHistory` field to `apps` table (JSON, default `[]`)
+3. Add `appManifestVersion` field to `rooms` table (String, required)
+4. Add indexes for version fields
+
+**Migration Steps:**
+
+```bash
+# Create migration
+npx prisma migrate dev --name add_manifest_versioning
+```
+
+**Generated SQL (Summary):**
+```sql
+-- Add versioning fields to apps
+ALTER TABLE "apps" ADD COLUMN "manifestVersion" TEXT NOT NULL DEFAULT '1.0.0';
+ALTER TABLE "apps" ADD COLUMN "manifestHistory" JSONB NOT NULL DEFAULT '[]';
+
+-- Add version lock field to rooms
+ALTER TABLE "rooms" ADD COLUMN "appManifestVersion" TEXT NOT NULL DEFAULT '1.0.0';
+
+-- Add indexes
+CREATE INDEX "apps_manifestVersion_idx" ON "apps"("manifestVersion");
+CREATE INDEX "rooms_appManifestVersion_idx" ON "rooms"("appManifestVersion");
+CREATE INDEX "rooms_appId_appManifestVersion_idx" ON "rooms"("appId", "appManifestVersion");
+```
+
+**Data Migration Script:**
+
+If apps and rooms already exist, you need to backfill version fields:
+
+```typescript
+// platform/scripts/backfill-manifest-versions.ts
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function backfillManifestVersions() {
+  console.log('Starting manifest version backfill...');
+
+  // Get all apps
+  const apps = await prisma.app.findMany();
+
+  for (const app of apps) {
+    // Extract version from manifest
+    const manifest = app.manifest as any;
+    const version = manifest.meta?.version || '1.0.0';
+
+    // Update app with extracted version
+    await prisma.app.update({
+      where: { id: app.id },
+      data: {
+        manifestVersion: version,
+        manifestHistory: [],
+      },
+    });
+
+    console.log(`Updated app ${app.appId} to version ${version}`);
+
+    // Update all rooms for this app
+    await prisma.room.updateMany({
+      where: { appId: app.appId },
+      data: { appManifestVersion: version },
+    });
+
+    const roomCount = await prisma.room.count({
+      where: { appId: app.appId },
+    });
+
+    console.log(`Locked ${roomCount} rooms to version ${version}`);
+  }
+
+  console.log('Backfill complete!');
+}
+
+backfillManifestVersions()
+  .catch((error) => {
+    console.error('Backfill failed:', error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+```
+
+**Run Backfill:**
+```bash
+npx tsx platform/scripts/backfill-manifest-versions.ts
+```
+
+### Validation After Migration
+
+```bash
+# Verify all apps have versions
+npx prisma studio
+
+# Check data:
+# 1. All apps.manifestVersion should be populated
+# 2. All rooms.appManifestVersion should be populated
+# 3. Apps.manifestHistory should be empty array []
+```
+
 ## Next Steps
 
 After successful migration:
@@ -317,6 +426,9 @@ After successful migration:
 5. [ ] Set up database backups
 6. [ ] Configure connection pooling for production
 7. [ ] Document any custom migrations
+8. [ ] Run manifest versioning backfill (if existing data)
+9. [ ] Test manifest version validation logic
+10. [ ] Update API endpoints to handle versioning
 
 ## Authentication Schema Changes
 

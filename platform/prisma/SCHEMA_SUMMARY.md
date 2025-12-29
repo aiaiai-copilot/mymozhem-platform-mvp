@@ -62,11 +62,19 @@ Flexible data storage without schema migrations:
 
 | Table | Field | Purpose |
 |-------|-------|---------|
-| `apps` | `manifest` | Application configuration, permissions, settings schema |
-| `rooms` | `appSettings` | App-specific room configuration |
+| `apps` | `manifest` | Current application manifest (configuration, permissions, settings schema) |
+| `apps` | `manifestHistory` | Array of previous manifest versions with metadata |
+| `rooms` | `appSettings` | App-specific room configuration (validated against locked manifest version) |
 | `participants` | `metadata` | App-specific participant data (tickets, scores, etc.) |
 | `prizes` | `metadata` | Additional prize info (value, sponsor, category) |
 | `winners` | `metadata` | Selection metadata (algorithm, timestamp, draw number) |
+
+**Manifest Versioning:**
+- Each app has a current `manifestVersion` (e.g., "1.2.3")
+- Previous versions stored in `manifestHistory` as complete snapshots
+- Rooms lock to `appManifestVersion` at creation time
+- Settings validated against locked version (not current version)
+- See `MANIFEST_VERSIONING.md` for complete details
 
 ### 5. Enums
 
@@ -85,17 +93,24 @@ Flexible data storage without schema migrations:
 
 ### 6. Indexing Strategy
 
-**40 Total Indexes:**
+**45 Total Indexes:**
 - 8 Primary key indexes (automatic)
 - 11 Foreign key indexes (automatic)
 - 8 Unique constraint indexes
-- 10 Single-column indexes (status, role, timestamps, token lookups)
-- 3 Composite indexes (common query patterns)
+- 13 Single-column indexes (status, role, timestamps, token lookups, manifest versions)
+- 5 Composite indexes (common query patterns)
 
 **Composite Indexes:**
 1. `rooms(status, isPublic, appId)` - Room listing optimization
 2. `participants(roomId, role)` - Permission checks
 3. `winners(roomId, prizeId)` - Prize distribution tracking
+4. `rooms(appId, appManifestVersion)` - Query rooms by app and version
+5. `users(provider, providerId)` - OAuth lookup optimization
+
+**Manifest Versioning Indexes:**
+- `apps(manifestVersion)` - Query apps by version
+- `rooms(appManifestVersion)` - Query rooms by manifest version
+- `rooms(appId, appManifestVersion)` - Version-specific room queries
 
 **Index Justification:** See `INDEX_STRATEGY.md`
 
@@ -119,10 +134,11 @@ Schema optimized for:
 | Tables | 8 |
 | Enums | 2 |
 | Relations | 13 |
-| Indexes | 40 |
-| JSON Fields | 5 |
+| Indexes | 45 |
+| JSON Fields | 6 |
 | Soft Deletes | 6 |
 | Unique Constraints | 6 |
+| Versioned Fields | 3 (App.manifestVersion, App.manifestHistory, Room.appManifestVersion) |
 
 ## API Alignment
 
@@ -282,13 +298,14 @@ Schema fully supports all endpoints defined in:
 
 All documentation is comprehensive and ready for development:
 
-1. **`schema.prisma`** - Complete schema definition (204 lines)
+1. **`schema.prisma`** - Complete schema definition with versioning support
 2. **`seed.ts`** - Test data generator (400+ lines)
 3. **`MIGRATION_PLAN.md`** - Migration strategy
 4. **`INDEX_STRATEGY.md`** - Index justification and monitoring
-5. **`QUERY_EXAMPLES.md`** - Practical Prisma queries
-6. **`README.md`** - Quick start and common tasks
-7. **`SCHEMA_SUMMARY.md`** - This document
+5. **`QUERY_EXAMPLES.md`** - Practical Prisma queries including versioning
+6. **`MANIFEST_VERSIONING.md`** - Complete manifest versioning guide
+7. **`README.md`** - Quick start and common tasks
+8. **`SCHEMA_SUMMARY.md`** - This document
 
 ## Conclusion
 

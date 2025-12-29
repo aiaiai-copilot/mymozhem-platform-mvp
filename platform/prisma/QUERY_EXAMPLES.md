@@ -299,21 +299,25 @@ const revokedTokens = await prisma.tokenBlacklist.findMany({
 ### Register Application
 
 ```typescript
+const manifest = {
+  meta: {
+    name: 'Holiday Lottery',
+    version: '1.0.0',
+    description: 'Lottery application',
+  },
+  baseUrl: 'https://lottery.example.com',
+  capabilities: ['winnerSelection'],
+  permissions: ['users:read', 'rooms:read'],
+  settings: { /* JSON Schema */ },
+};
+
 const app = await prisma.app.create({
   data: {
     appId: 'app_lottery_v1',
     appSecret: 'sk_live_generated_secret',
-    manifest: {
-      meta: {
-        name: 'Holiday Lottery',
-        version: '1.0.0',
-        description: 'Lottery application',
-      },
-      baseUrl: 'https://lottery.example.com',
-      capabilities: ['winnerSelection'],
-      permissions: ['users:read', 'rooms:read'],
-      settings: { /* JSON Schema */ },
-    },
+    manifest: manifest,
+    manifestVersion: manifest.meta.version, // Extract from manifest
+    manifestHistory: [], // Empty for first version
     isActive: true,
   },
 });
@@ -359,12 +363,72 @@ const apps = await prisma.app.findMany({
 ### Update App Manifest
 
 ```typescript
+// Fetch current app state
+const currentApp = await prisma.app.findUnique({
+  where: { appId: 'app_lottery_v1' },
+});
+
+const newManifest = {
+  meta: {
+    name: 'Holiday Lottery',
+    version: '1.1.0', // Incremented version
+    description: 'Lottery application with new features',
+  },
+  // ... rest of manifest
+};
+
+// Archive current version to history
+const historyEntry = {
+  version: currentApp.manifestVersion,
+  manifest: currentApp.manifest,
+  publishedAt: currentApp.updatedAt.toISOString(),
+  deprecatedAt: null,
+};
+
+const updatedHistory = [...(currentApp.manifestHistory as any[]), historyEntry];
+
+// Update app with new manifest
 const app = await prisma.app.update({
   where: { appId: 'app_lottery_v1' },
   data: {
-    manifest: {
-      /* updated manifest */
+    manifest: newManifest,
+    manifestVersion: newManifest.meta.version,
+    manifestHistory: updatedHistory,
+  },
+});
+```
+
+### Get Manifest for Specific Version
+
+```typescript
+const app = await prisma.app.findUnique({
+  where: { appId: 'app_lottery_v1' },
+});
+
+// Get manifest for version 1.0.0
+let manifestV1_0_0;
+
+if (app.manifestVersion === '1.0.0') {
+  // Current version
+  manifestV1_0_0 = app.manifest;
+} else {
+  // Search in history
+  const historyEntry = (app.manifestHistory as any[]).find(
+    (entry) => entry.version === '1.0.0'
+  );
+  manifestV1_0_0 = historyEntry?.manifest;
+}
+```
+
+### Find Apps by Manifest Version
+
+```typescript
+const appsV1 = await prisma.app.findMany({
+  where: {
+    manifestVersion: {
+      startsWith: '1.', // All v1.x.x versions
     },
+    isActive: true,
   },
 });
 ```
@@ -374,6 +438,15 @@ const app = await prisma.app.update({
 ### Create Room
 
 ```typescript
+// Fetch app to get current manifest version
+const app = await prisma.app.findUnique({
+  where: { appId: 'app_lottery_v1' },
+});
+
+// Validate settings against current manifest (done in service layer)
+// ...
+
+// Create room locked to current manifest version
 const room = await prisma.room.create({
   data: {
     name: 'New Year Lottery 2025',
@@ -383,6 +456,7 @@ const room = await prisma.room.create({
       ticketCount: 100,
       drawDate: '2025-12-31T23:00:00Z',
     },
+    appManifestVersion: app.manifestVersion, // Lock to current version
     status: 'ACTIVE',
     isPublic: true,
     createdBy: 'usr_abc123',
@@ -1118,5 +1192,479 @@ const prisma = new PrismaClient({
 prisma.$on('query', (e) => {
   console.log('Query: ' + e.query);
   console.log('Duration: ' + e.duration + 'ms');
+});
+```
+
+---
+
+## Manifest Versioning Queries
+
+### Validate Room Settings Against Locked Version
+
+```typescript
+/**
+ * Validate room settings against the manifest version it was created with
+ */
+async function validateRoomSettings(roomId: string) {
+  // Fetch room with app data
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: { app: true },
+  });
+
+  // Get manifest for room's locked version
+  let manifest;
+
+  if (room.app.manifestVersion === room.appManifestVersion) {
+    // Room uses current version
+    manifest = room.app.manifest;
+  } else {
+    // Room uses historical version - fetch from history
+    const historyEntry = (room.app.manifestHistory as any[]).find(
+      (entry) => entry.version === room.appManifestVersion
+    );
+
+    if (!historyEntry) {
+      throw new Error(
+        `Manifest version ${room.appManifestVersion} not found in history`
+      );
+    }
+
+    manifest = historyEntry.manifest;
+  }
+
+  // Validate settings against correct schema
+  const settingsSchema = manifest.settings;
+  // Use JSON Schema validator here
+  // const isValid = validateJsonSchema(room.appSettings, settingsSchema);
+
+  return { manifest, settingsSchema };
+}
+```
+
+### Find Rooms by Manifest Version
+
+```typescript
+// Find all rooms using v1.0.0
+const roomsV1_0_0 = await prisma.room.findMany({
+  where: {
+    appId: 'app_lottery_v1',
+    appManifestVersion: '1.0.0',
+    deletedAt: null,
+  },
+  include: {
+    _count: {
+      select: {
+        participants: true,
+        prizes: true,
+      },
+    },
+  },
+});
+```
+
+### Count Rooms per Manifest Version
+
+```typescript
+// Get distribution of rooms across manifest versions
+const versionDistribution = await prisma.room.groupBy({
+  by: ['appManifestVersion'],
+  where: {
+    appId: 'app_lottery_v1',
+    deletedAt: null,
+  },
+  _count: {
+    id: true,
+  },
+  orderBy: {
+    _count: {
+      id: 'desc',
+    },
+  },
+});
+
+// Result: [
+//   { appManifestVersion: '1.0.0', _count: { id: 42 } },
+//   { appManifestVersion: '1.1.0', _count: { id: 18 } },
+//   { appManifestVersion: '1.2.0', _count: { id: 5 } },
+// ]
+```
+
+### Find Rooms Needing Upgrade
+
+```typescript
+// Find active rooms using outdated manifest versions
+const app = await prisma.app.findUnique({
+  where: { appId: 'app_lottery_v1' },
+});
+
+const currentVersion = app.manifestVersion;
+
+const outdatedRooms = await prisma.room.findMany({
+  where: {
+    appId: 'app_lottery_v1',
+    appManifestVersion: {
+      not: currentVersion, // Not using current version
+    },
+    status: {
+      in: ['DRAFT', 'ACTIVE'], // Only active rooms
+    },
+    deletedAt: null,
+  },
+  include: {
+    organizer: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    },
+  },
+  orderBy: {
+    createdAt: 'asc', // Oldest first
+  },
+});
+```
+
+### Upgrade Room to New Manifest Version
+
+```typescript
+/**
+ * Upgrade a room to a new manifest version
+ * Should validate settings against new schema first
+ */
+async function upgradeRoomManifest(roomId: string, targetVersion: string) {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: { app: true },
+  });
+
+  // Get target manifest
+  let targetManifest;
+
+  if (room.app.manifestVersion === targetVersion) {
+    targetManifest = room.app.manifest;
+  } else {
+    const historyEntry = (room.app.manifestHistory as any[]).find(
+      (entry) => entry.version === targetVersion
+    );
+
+    if (!historyEntry) {
+      throw new Error(`Target version ${targetVersion} not found`);
+    }
+
+    targetManifest = historyEntry.manifest;
+  }
+
+  // Validate current settings against new schema
+  const settingsSchema = targetManifest.settings;
+  // const isValid = validateJsonSchema(room.appSettings, settingsSchema);
+  // if (!isValid) throw new Error('Settings incompatible with target version');
+
+  // Upgrade room
+  return await prisma.room.update({
+    where: { id: roomId },
+    data: {
+      appManifestVersion: targetVersion,
+    },
+  });
+}
+```
+
+### Find Deprecated Manifest Versions
+
+```typescript
+/**
+ * Find deprecated manifest versions from history
+ */
+async function getDeprecatedVersions(appId: string) {
+  const app = await prisma.app.findUnique({
+    where: { appId },
+  });
+
+  const deprecatedVersions = (app.manifestHistory as any[]).filter(
+    (entry) => entry.deprecatedAt !== null
+  );
+
+  return deprecatedVersions.map((entry) => ({
+    version: entry.version,
+    deprecatedAt: entry.deprecatedAt,
+    deprecationReason: entry.deprecationReason,
+  }));
+}
+```
+
+### Get Rooms Affected by Deprecation
+
+```typescript
+/**
+ * Find active rooms using a specific deprecated version
+ */
+async function getRoomsOnDeprecatedVersion(
+  appId: string,
+  deprecatedVersion: string
+) {
+  return await prisma.room.findMany({
+    where: {
+      appId: appId,
+      appManifestVersion: deprecatedVersion,
+      status: {
+        in: ['DRAFT', 'ACTIVE'],
+      },
+      deletedAt: null,
+    },
+    include: {
+      organizer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      _count: {
+        select: {
+          participants: true,
+          prizes: true,
+        },
+      },
+    },
+  });
+}
+```
+
+### Bulk Upgrade Rooms (with Transaction)
+
+```typescript
+/**
+ * Bulk upgrade compatible rooms to new manifest version
+ * Only upgrades rooms where settings are compatible
+ */
+async function bulkUpgradeRooms(
+  appId: string,
+  fromVersion: string,
+  toVersion: string
+) {
+  // Find rooms to upgrade
+  const roomsToUpgrade = await prisma.room.findMany({
+    where: {
+      appId: appId,
+      appManifestVersion: fromVersion,
+      deletedAt: null,
+    },
+  });
+
+  // Get target manifest for validation
+  const app = await prisma.app.findUnique({
+    where: { appId },
+  });
+
+  let targetManifest;
+  if (app.manifestVersion === toVersion) {
+    targetManifest = app.manifest;
+  } else {
+    const entry = (app.manifestHistory as any[]).find(
+      (e) => e.version === toVersion
+    );
+    targetManifest = entry?.manifest;
+  }
+
+  // Validate and upgrade in transaction
+  const results = await prisma.$transaction(
+    roomsToUpgrade.map((room) => {
+      // Validate settings against target schema
+      // const isValid = validateJsonSchema(room.appSettings, targetManifest.settings);
+
+      // Only upgrade if compatible
+      // if (isValid) {
+        return prisma.room.update({
+          where: { id: room.id },
+          data: { appManifestVersion: toVersion },
+        });
+      // } else {
+      //   return null; // Skip incompatible rooms
+      // }
+    })
+  );
+
+  return {
+    totalRooms: roomsToUpgrade.length,
+    upgradedCount: results.filter((r) => r !== null).length,
+  };
+}
+```
+
+### Get Manifest Version Timeline
+
+```typescript
+/**
+ * Get complete version history for an app
+ */
+async function getManifestTimeline(appId: string) {
+  const app = await prisma.app.findUnique({
+    where: { appId },
+  });
+
+  // Combine current version with history
+  const timeline = [
+    ...(app.manifestHistory as any[]).map((entry) => ({
+      version: entry.version,
+      publishedAt: entry.publishedAt,
+      deprecatedAt: entry.deprecatedAt,
+      isCurrent: false,
+    })),
+    {
+      version: app.manifestVersion,
+      publishedAt: app.updatedAt.toISOString(),
+      deprecatedAt: null,
+      isCurrent: true,
+    },
+  ];
+
+  // Sort by version (newest first)
+  return timeline.sort((a, b) =>
+    b.version.localeCompare(a.version, undefined, { numeric: true })
+  );
+}
+```
+
+### Manifest Version Analytics
+
+```typescript
+/**
+ * Get analytics about manifest version adoption
+ */
+async function getVersionAnalytics(appId: string) {
+  const app = await prisma.app.findUnique({
+    where: { appId },
+  });
+
+  // Count rooms per version
+  const versionCounts = await prisma.room.groupBy({
+    by: ['appManifestVersion'],
+    where: {
+      appId: appId,
+      deletedAt: null,
+    },
+    _count: {
+      id: true,
+    },
+  });
+
+  // Calculate percentages
+  const totalRooms = versionCounts.reduce((sum, v) => sum + v._count.id, 0);
+
+  const analytics = versionCounts.map((v) => {
+    const isDeprecated = (app.manifestHistory as any[]).some(
+      (entry) => entry.version === v.appManifestVersion && entry.deprecatedAt !== null
+    );
+
+    return {
+      version: v.appManifestVersion,
+      roomCount: v._count.id,
+      percentage: ((v._count.id / totalRooms) * 100).toFixed(2),
+      isCurrent: v.appManifestVersion === app.manifestVersion,
+      isDeprecated: isDeprecated,
+    };
+  });
+
+  return {
+    currentVersion: app.manifestVersion,
+    totalRooms,
+    versionBreakdown: analytics,
+  };
+}
+```
+
+---
+
+## Manifest Versioning Best Practices
+
+### 1. Always Lock Rooms to Manifest Version
+
+```typescript
+// GOOD: Lock room to current manifest version
+const app = await prisma.app.findUnique({ where: { appId } });
+await prisma.room.create({
+  data: {
+    // ... other fields
+    appManifestVersion: app.manifestVersion, // Lock to current
+  },
+});
+
+// BAD: Don't create rooms without version lock
+await prisma.room.create({
+  data: {
+    // ... other fields
+    // Missing appManifestVersion!
+  },
+});
+```
+
+### 2. Validate Against Locked Version
+
+```typescript
+// GOOD: Fetch manifest for room's locked version
+const room = await prisma.room.findUnique({
+  where: { id: roomId },
+  include: { app: true },
+});
+
+const manifest = getManifestForVersion(room.app, room.appManifestVersion);
+validateSettings(room.appSettings, manifest.settings);
+
+// BAD: Validate against current manifest
+validateSettings(room.appSettings, room.app.manifest.settings); // Wrong version!
+```
+
+### 3. Archive Before Updating
+
+```typescript
+// GOOD: Archive current version before updating
+const currentApp = await prisma.app.findUnique({ where: { appId } });
+
+const updatedHistory = [
+  ...(currentApp.manifestHistory as any[]),
+  {
+    version: currentApp.manifestVersion,
+    manifest: currentApp.manifest,
+    publishedAt: currentApp.updatedAt.toISOString(),
+    deprecatedAt: null,
+  },
+];
+
+await prisma.app.update({
+  where: { appId },
+  data: {
+    manifest: newManifest,
+    manifestVersion: newVersion,
+    manifestHistory: updatedHistory,
+  },
+});
+
+// BAD: Update without archiving
+await prisma.app.update({
+  where: { appId },
+  data: {
+    manifest: newManifest, // Old version lost forever!
+  },
+});
+```
+
+### 4. Check Compatibility Before Upgrade
+
+```typescript
+// GOOD: Validate before upgrading
+const isCompatible = validateSettings(room.appSettings, targetManifest.settings);
+
+if (isCompatible) {
+  await upgradeRoom(roomId, targetVersion);
+} else {
+  throw new Error('Room settings incompatible with target version');
+}
+
+// BAD: Upgrade without validation
+await prisma.room.update({
+  where: { id: roomId },
+  data: { appManifestVersion: targetVersion }, // May break room!
 });
 ```

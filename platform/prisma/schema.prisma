@@ -93,8 +93,10 @@ model App {
   appId     String @unique // app_lottery_v1
   appSecret String @unique // sk_live_abc123...
 
-  // Manifest stored as JSON
-  manifest Json
+  // Manifest versioning
+  manifest        Json // Current manifest (JSON)
+  manifestVersion String // Semantic version (e.g., "1.2.3")
+  manifestHistory Json   @default("[]") // Array of previous manifest versions with metadata
 
   // Status
   isActive Boolean @default(true)
@@ -110,6 +112,7 @@ model App {
   @@index([appId])
   @@index([isActive])
   @@index([deletedAt])
+  @@index([manifestVersion]) // Query by specific manifest version
   @@map("apps")
 }
 
@@ -130,8 +133,9 @@ model Room {
   description String?
 
   // Application integration
-  appId       String
-  appSettings Json // Application-specific settings validated against app manifest
+  appId              String
+  appSettings        Json // Application-specific settings validated against app manifest
+  appManifestVersion String // Manifest version used when room was created (locks room to specific schema)
 
   // Status & visibility
   status   RoomStatus @default(DRAFT)
@@ -158,7 +162,9 @@ model Room {
   @@index([createdBy])
   @@index([createdAt])
   @@index([deletedAt])
+  @@index([appManifestVersion]) // Query rooms by manifest version
   @@index([status, isPublic, appId]) // Composite index for common queries
+  @@index([appId, appManifestVersion]) // Query rooms by app and version
   @@map("rooms")
 }
 

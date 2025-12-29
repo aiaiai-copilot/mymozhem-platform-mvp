@@ -643,6 +643,67 @@ X-Max-Attempts: 1
 
 ---
 
+## Manifest Versioning
+
+### Version Requirements
+
+**All manifests MUST include semantic version in `meta.version`:**
+- Format: `MAJOR.MINOR.PATCH` (e.g., "1.2.3")
+- **MAJOR** - Breaking changes (incompatible schema changes)
+- **MINOR** - New features (backward-compatible additions)
+- **PATCH** - Bug fixes (no schema changes)
+
+**Platform behavior:**
+- Extracts `meta.version` and stores in `App.manifestVersion`
+- Archives previous versions in `App.manifestHistory`
+- Locks rooms to `appManifestVersion` at creation time
+- Validates room settings against locked version (not current version)
+
+**Example:**
+```json
+{
+  "meta": {
+    "name": "Holiday Lottery",
+    "version": "1.2.3",  // REQUIRED: Semantic version
+    "description": "..."
+  }
+}
+```
+
+### Version Locking
+
+**How it works:**
+
+1. **App Registration (v1.0.0):**
+   - Platform stores manifest with `manifestVersion: "1.0.0"`
+   - `manifestHistory` is empty `[]`
+
+2. **Room Creation:**
+   - Room locked to current version: `appManifestVersion: "1.0.0"`
+   - Settings validated against v1.0.0 schema
+   - Room will **always** use v1.0.0 schema (even after app updates)
+
+3. **Manifest Update (v1.1.0):**
+   - Platform archives v1.0.0 to `manifestHistory`
+   - Updates `manifestVersion: "1.1.0"`
+   - **Old rooms still use v1.0.0** (not affected)
+   - **New rooms use v1.1.0** (new features available)
+
+4. **Validation:**
+   - Platform fetches manifest for room's locked version
+   - If locked version is in history, fetch from `manifestHistory`
+   - Validate settings against correct schema version
+
+**Benefits:**
+- Old rooms never break when app updates
+- New features available immediately for new rooms
+- Organizers can upgrade rooms when ready (opt-in)
+- Complete version history preserved
+
+See `platform/prisma/MANIFEST_VERSIONING.md` for complete details.
+
+---
+
 ## Manifest Updates
 
 ### Updating Existing App
@@ -653,25 +714,63 @@ Authorization: Bearer {adminToken}
 Content-Type: application/json
 
 {
-  "manifest": { /* updated manifest */ }
+  "manifest": {
+    "meta": {
+      "name": "Holiday Lottery",
+      "version": "1.1.0",  // MUST increment from current version
+      "description": "..."
+    },
+    // ... rest of updated manifest
+  }
 }
 ```
 
+**Platform Processing:**
+
+1. **Extract new version:** `newVersion = manifest.meta.version` ("1.1.0")
+2. **Validate version increment:** `newVersion > currentVersion`
+3. **Archive current version:**
+   ```json
+   {
+     "version": "1.0.0",
+     "manifest": { /* complete v1.0.0 manifest */ },
+     "publishedAt": "2025-01-15T10:00:00Z",
+     "deprecatedAt": null
+   }
+   ```
+4. **Update app:**
+   - `manifest` = new manifest
+   - `manifestVersion` = "1.1.0"
+   - `manifestHistory` = [...history, archived v1.0.0]
+
 **Update Rules:**
-1. Version must increment (semver)
-2. Cannot remove capabilities used by active rooms
-3. Cannot remove permissions used by active operations
-4. Settings schema changes:
-   - Can add optional fields
-   - Cannot remove required fields
-   - Cannot change field types for existing fields
+1. **Version must increment (semver)**
+   - "1.0.0" → "1.1.0" ✓
+   - "1.0.0" → "1.0.0" ✗ (no change)
+   - "1.1.0" → "1.0.0" ✗ (downgrade not allowed)
+
+2. **Cannot remove capabilities used by active rooms**
+   - Check if any active rooms use removed capabilities
+   - Return error with affected room count
+
+3. **Cannot remove permissions used by active operations**
+   - Apps may depend on these permissions
+   - Deprecate first, remove later
+
+4. **Settings schema changes:**
+   - **Can add optional fields** (minor version bump)
+   - **Can add required fields with defaults** (minor version bump, provide migration)
+   - **Cannot remove required fields** (major version bump, breaking change)
+   - **Cannot change field types** (major version bump, breaking change)
 
 **Breaking Changes:**
 If breaking changes needed:
-1. Increment major version
-2. Notify room organizers
-3. Provide migration path
-4. Deprecate old version
+1. **Increment major version** (1.x.x → 2.0.0)
+2. **Document changes** (changelog, migration guide)
+3. **Notify organizers** (email, in-app notification)
+4. **Provide migration path** (upgrade script, manual steps)
+5. **Set deprecation timeline** (e.g., 90 days)
+6. **Deprecate old version** (mark in history)
 
 ---
 
@@ -758,6 +857,92 @@ Manifest is valid and ready for registration!
 
 ---
 
+## Room Manifest Upgrade
+
+### Upgrading Room to New Manifest Version
+
+Organizers can upgrade rooms to newer manifest versions (opt-in).
+
+**Request:**
+```http
+POST /api/rooms/{roomId}/upgrade-manifest
+Authorization: Bearer {userToken}
+Content-Type: application/json
+
+{
+  "targetVersion": "1.1.0"
+}
+```
+
+**Platform Processing:**
+
+1. **Permission check:** User must be room organizer
+2. **Fetch target manifest:**
+   - From current manifest if `targetVersion === app.manifestVersion`
+   - From `manifestHistory` if older version
+3. **Validate compatibility:**
+   - Check if current settings valid against new schema
+   - Identify missing required fields
+4. **Upgrade or request migration:**
+   - If compatible: upgrade immediately
+   - If incompatible: return migration requirements
+
+**Response (Compatible):**
+```json
+{
+  "success": true,
+  "data": {
+    "newVersion": "1.1.0",
+    "previousVersion": "1.0.0",
+    "upgradeDate": "2025-01-20T15:30:00Z"
+  }
+}
+```
+
+**Response (Incompatible - Migration Required):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "MIGRATION_REQUIRED",
+    "message": "Room settings incompatible with target version",
+    "details": {
+      "targetVersion": "2.0.0",
+      "currentVersion": "1.0.0",
+      "missingFields": [
+        {
+          "field": "drawType",
+          "type": "string",
+          "required": true,
+          "description": "Type of draw algorithm"
+        }
+      ],
+      "instructions": "Please provide missing fields to complete upgrade"
+    }
+  }
+}
+```
+
+**With Migration Data:**
+```http
+POST /api/rooms/{roomId}/upgrade-manifest
+Content-Type: application/json
+
+{
+  "targetVersion": "2.0.0",
+  "migrationData": {
+    "drawType": "random"  // Provide missing required field
+  }
+}
+```
+
+**Platform Processing:**
+1. Merge `migrationData` with existing `appSettings`
+2. Validate merged settings against target schema
+3. Update room with new settings and version
+
+---
+
 ## Migration Guide
 
 ### Updating from v1.0 to v2.0
@@ -777,14 +962,68 @@ If making breaking changes:
    - List settings schema changes
 
 3. **Provide migration path**
-   - Export/import tool for room settings
-   - Backward compatibility period
-   - Clear migration instructions
+   - Document required field additions
+   - Provide migration script for apps
+   - Supply default values when possible
+   - Clear migration instructions for organizers
 
 4. **Notify users**
    - Email organizers of affected rooms
-   - In-app notification
-   - Migration deadline
+   - In-app notification with upgrade link
+   - Migration deadline (e.g., 90 days)
+   - Link to migration guide
+
+5. **Deprecate old version**
+   ```http
+   POST /api/apps/{appId}/deprecate-version
+   Content-Type: application/json
+
+   {
+     "version": "1.0.0",
+     "reason": "Security fixes in v2.0.0",
+     "deadline": "2025-04-01T00:00:00Z"
+   }
+   ```
+
+### Example Migration Scenario
+
+**v1.0.0 Schema:**
+```json
+{
+  "settings": {
+    "properties": {
+      "ticketCount": { "type": "integer", "minimum": 1 }
+    },
+    "required": ["ticketCount"]
+  }
+}
+```
+
+**v2.0.0 Schema (Breaking Change):**
+```json
+{
+  "settings": {
+    "properties": {
+      "ticketCount": { "type": "integer", "minimum": 1 },
+      "drawType": { "type": "string", "enum": ["random", "sequential"] }
+    },
+    "required": ["ticketCount", "drawType"]  // Added required field
+  }
+}
+```
+
+**Migration Steps:**
+
+1. **App developer updates manifest to v2.0.0**
+2. **Platform archives v1.0.0** to manifestHistory
+3. **Old rooms remain on v1.0.0** (continue working)
+4. **New rooms created with v2.0.0** (must provide drawType)
+5. **Organizers notified** about upgrade availability
+6. **Organizers upgrade rooms:**
+   - View upgrade UI
+   - Provide drawType value
+   - Platform validates and upgrades
+7. **After deadline:** Platform may auto-upgrade with defaults or restrict old version features
 
 ---
 
