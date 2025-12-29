@@ -1577,6 +1577,556 @@ async function getVersionAnalytics(appId: string) {
 
 ---
 
+## Billing & Subscription Queries
+
+### Create Subscription Plan
+
+```typescript
+const freePlan = await prisma.subscriptionPlan.create({
+  data: {
+    tier: 'FREE',
+    name: 'Free Plan',
+    description: 'Perfect for trying out the platform',
+    price: 0,
+    currency: 'USD',
+    billingInterval: 'MONTHLY',
+    isActive: true,
+    displayOrder: 0,
+    features: {
+      maxRooms: 3,
+      maxParticipantsPerRoom: 50,
+      maxPrizesPerRoom: 10,
+      apps: ['app_lottery_v1'],
+      features: ['basic_analytics', 'community_support'],
+      trialDays: 0,
+    },
+  },
+});
+```
+
+### Create User Subscription
+
+```typescript
+const subscription = await prisma.subscription.create({
+  data: {
+    userId: 'usr_abc123',
+    planId: freePlan.id,
+    status: 'ACTIVE',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000), // 30 days
+  },
+  include: {
+    plan: true,
+    user: {
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    },
+  },
+});
+```
+
+### Get User's Active Subscription
+
+```typescript
+const activeSubscription = await prisma.subscription.findFirst({
+  where: {
+    userId: 'usr_abc123',
+    status: 'ACTIVE',
+    deletedAt: null,
+  },
+  include: {
+    plan: true,
+  },
+});
+
+// Extract features
+const features = activeSubscription.plan.features as any;
+const maxRooms = features.maxRooms;
+const hasAdvancedAnalytics = features.features?.includes('advanced_analytics');
+```
+
+### Start Trial Subscription
+
+```typescript
+const proPlan = await prisma.subscriptionPlan.findFirst({
+  where: {
+    tier: 'PRO',
+    billingInterval: 'MONTHLY',
+  },
+});
+
+const features = proPlan.features as any;
+const trialDays = features.trialDays || 14;
+
+const trialSubscription = await prisma.subscription.create({
+  data: {
+    userId: 'usr_abc123',
+    planId: proPlan.id,
+    status: 'TRIALING',
+    trialStart: new Date(),
+    trialEnd: new Date(Date.now() + trialDays * 24 * 3600 * 1000),
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+  },
+});
+```
+
+### Convert Trial to Paid
+
+```typescript
+// After successful Stripe payment
+await prisma.subscription.update({
+  where: { id: trialSubscription.id },
+  data: {
+    status: 'ACTIVE',
+    stripeCustomerId: 'cus_xxx',
+    stripeSubscriptionId: 'sub_xxx',
+  },
+});
+
+// Create payment record
+await prisma.payment.create({
+  data: {
+    subscriptionId: trialSubscription.id,
+    userId: 'usr_abc123',
+    amount: 2999, // $29.99
+    currency: 'USD',
+    status: 'succeeded',
+    paymentMethod: 'card',
+    stripePaymentIntentId: 'pi_xxx',
+    stripeChargeId: 'ch_xxx',
+  },
+});
+```
+
+### Cancel Subscription
+
+```typescript
+// User cancels (but subscription stays active until period end)
+await prisma.subscription.update({
+  where: { id: subscription.id },
+  data: {
+    cancelAtPeriodEnd: true,
+    canceledAt: new Date(),
+    cancelReason: 'Too expensive',
+    status: 'CANCELED',
+  },
+});
+```
+
+### Check Subscription Limits
+
+```typescript
+async function checkRoomLimit(userId: string): Promise<boolean> {
+  // Get active subscription
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      userId: userId,
+      status: 'ACTIVE',
+      deletedAt: null,
+    },
+    include: { plan: true },
+  });
+
+  const features = subscription.plan.features as any;
+  const maxRooms = features.maxRooms;
+
+  // -1 means unlimited
+  if (maxRooms === -1) return true;
+
+  // Count user's rooms
+  const roomCount = await prisma.room.count({
+    where: {
+      createdBy: userId,
+      deletedAt: null,
+    },
+  });
+
+  return roomCount < maxRooms;
+}
+```
+
+### Track Usage
+
+```typescript
+// Track room creation
+await prisma.usageRecord.create({
+  data: {
+    subscriptionId: subscription.id,
+    userId: 'usr_abc123',
+    metricName: 'rooms_created',
+    quantity: 1,
+    metadata: {
+      roomId: 'room_xyz789',
+      appId: 'app_lottery_v1',
+    },
+  },
+});
+
+// Track participant addition
+await prisma.usageRecord.create({
+  data: {
+    subscriptionId: subscription.id,
+    userId: 'usr_abc123',
+    metricName: 'participants_added',
+    quantity: 1,
+    metadata: {
+      roomId: 'room_xyz789',
+      participantId: 'part_123abc',
+    },
+  },
+});
+```
+
+### Get Usage for Current Period
+
+```typescript
+const subscription = await prisma.subscription.findUnique({
+  where: { id: 'sub_xxx' },
+});
+
+const usage = await prisma.usageRecord.groupBy({
+  by: ['metricName'],
+  where: {
+    subscriptionId: subscription.id,
+    timestamp: {
+      gte: subscription.currentPeriodStart,
+      lte: subscription.currentPeriodEnd,
+    },
+    deletedAt: null,
+  },
+  _sum: {
+    quantity: true,
+  },
+});
+
+// Result:
+// [
+//   { metricName: 'rooms_created', _sum: { quantity: 5 } },
+//   { metricName: 'participants_added', _sum: { quantity: 42 } },
+// ]
+```
+
+### Create Invoice
+
+```typescript
+const invoice = await prisma.invoice.create({
+  data: {
+    subscriptionId: subscription.id,
+    userId: 'usr_abc123',
+    invoiceNumber: 'INV-2025-001',
+    amount: 2999,
+    currency: 'USD',
+    status: 'open',
+    issuedAt: new Date(),
+    dueAt: new Date(Date.now() + 7 * 24 * 3600 * 1000), // 7 days
+    stripeInvoiceId: 'in_xxx',
+    lineItems: [
+      {
+        description: 'Pro Plan - January 2025',
+        quantity: 1,
+        unitPrice: 2999,
+        total: 2999,
+      },
+    ],
+  },
+});
+```
+
+### Mark Invoice as Paid
+
+```typescript
+await prisma.invoice.update({
+  where: { id: invoice.id },
+  data: {
+    status: 'paid',
+    paidAt: new Date(),
+  },
+});
+```
+
+### Get Expiring Subscriptions
+
+```typescript
+// Find subscriptions expiring in next 7 days
+const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+
+const expiring = await prisma.subscription.findMany({
+  where: {
+    status: 'ACTIVE',
+    currentPeriodEnd: {
+      lte: sevenDaysFromNow,
+      gte: new Date(),
+    },
+    deletedAt: null,
+  },
+  include: {
+    user: {
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    },
+    plan: true,
+  },
+  orderBy: {
+    currentPeriodEnd: 'asc',
+  },
+});
+```
+
+### Get Subscriptions by Status
+
+```typescript
+// Get all active subscriptions
+const activeSubscriptions = await prisma.subscription.findMany({
+  where: {
+    status: 'ACTIVE',
+    deletedAt: null,
+  },
+  include: {
+    user: true,
+    plan: true,
+  },
+});
+
+// Get trialing subscriptions
+const trials = await prisma.subscription.findMany({
+  where: {
+    status: 'TRIALING',
+    deletedAt: null,
+  },
+  include: {
+    user: true,
+    plan: true,
+  },
+});
+
+// Get past due subscriptions (payment failed)
+const pastDue = await prisma.subscription.findMany({
+  where: {
+    status: 'PAST_DUE',
+    deletedAt: null,
+  },
+  include: {
+    user: true,
+    plan: true,
+  },
+});
+```
+
+### Calculate MRR (Monthly Recurring Revenue)
+
+```typescript
+// Get all active monthly subscriptions
+const monthlySubscriptions = await prisma.subscription.findMany({
+  where: {
+    status: 'ACTIVE',
+    deletedAt: null,
+  },
+  include: {
+    plan: {
+      where: {
+        billingInterval: 'MONTHLY',
+      },
+    },
+  },
+});
+
+// Sum up monthly revenue
+const mrr = monthlySubscriptions.reduce((total, sub) => {
+  return total + (sub.plan?.price || 0);
+}, 0);
+
+console.log(`MRR: $${mrr / 100}`);
+```
+
+### Get Payment History for User
+
+```typescript
+const payments = await prisma.payment.findMany({
+  where: {
+    userId: 'usr_abc123',
+    deletedAt: null,
+  },
+  orderBy: {
+    createdAt: 'desc',
+  },
+  include: {
+    subscription: {
+      include: {
+        plan: true,
+      },
+    },
+  },
+});
+```
+
+### Subscription Analytics
+
+```typescript
+// Count subscriptions by tier
+const tierDistribution = await prisma.subscription.groupBy({
+  by: ['planId'],
+  where: {
+    status: 'ACTIVE',
+    deletedAt: null,
+  },
+  _count: {
+    id: true,
+  },
+});
+
+// Get plan details
+for (const tier of tierDistribution) {
+  const plan = await prisma.subscriptionPlan.findUnique({
+    where: { id: tier.planId },
+  });
+
+  console.log(`${plan.name}: ${tier._count.id} subscriptions`);
+}
+```
+
+### Failed Payments
+
+```typescript
+// Get failed payments in last 30 days
+const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+
+const failedPayments = await prisma.payment.findMany({
+  where: {
+    status: 'failed',
+    createdAt: {
+      gte: thirtyDaysAgo,
+    },
+    deletedAt: null,
+  },
+  include: {
+    subscription: {
+      include: {
+        user: true,
+        plan: true,
+      },
+    },
+  },
+  orderBy: {
+    createdAt: 'desc',
+  },
+});
+
+// Calculate failure rate
+const totalPayments = await prisma.payment.count({
+  where: {
+    createdAt: { gte: thirtyDaysAgo },
+  },
+});
+
+const failureRate = (failedPayments.length / totalPayments) * 100;
+console.log(`Payment failure rate: ${failureRate.toFixed(2)}%`);
+```
+
+### Upgrade Subscription
+
+```typescript
+// User upgrades from Free to Pro
+const currentSubscription = await prisma.subscription.findFirst({
+  where: {
+    userId: 'usr_abc123',
+    status: 'ACTIVE',
+  },
+});
+
+const proPlan = await prisma.subscriptionPlan.findFirst({
+  where: {
+    tier: 'PRO',
+    billingInterval: 'MONTHLY',
+  },
+});
+
+// Mark old subscription as expired
+await prisma.subscription.update({
+  where: { id: currentSubscription.id },
+  data: {
+    status: 'EXPIRED',
+    deletedAt: new Date(),
+  },
+});
+
+// Create new subscription
+const newSubscription = await prisma.subscription.create({
+  data: {
+    userId: 'usr_abc123',
+    planId: proPlan.id,
+    status: 'ACTIVE',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+    stripeCustomerId: currentSubscription.stripeCustomerId,
+    stripeSubscriptionId: 'sub_new_xxx',
+  },
+});
+```
+
+### Downgrade Subscription (at period end)
+
+```typescript
+// Mark for downgrade at end of current period
+await prisma.subscription.update({
+  where: { id: subscription.id },
+  data: {
+    metadata: {
+      downgradeToTier: 'FREE',
+      downgradePlanId: freePlan.id,
+      downgradeAt: subscription.currentPeriodEnd,
+    },
+  },
+});
+
+// In a cron job, check for pending downgrades
+const now = new Date();
+
+const pendingDowngrades = await prisma.subscription.findMany({
+  where: {
+    status: 'ACTIVE',
+    currentPeriodEnd: {
+      lte: now,
+    },
+    // Check metadata for downgrade flag
+  },
+});
+
+for (const sub of pendingDowngrades) {
+  const metadata = sub.metadata as any;
+
+  if (metadata.downgradeToTier) {
+    // Expire current subscription
+    await prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        status: 'EXPIRED',
+        deletedAt: new Date(),
+      },
+    });
+
+    // Create new subscription with lower tier
+    await prisma.subscription.create({
+      data: {
+        userId: sub.userId,
+        planId: metadata.downgradePlanId,
+        status: 'ACTIVE',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+      },
+    });
+  }
+}
+```
+
+---
+
 ## Manifest Versioning Best Practices
 
 ### 1. Always Lock Rooms to Manifest Version

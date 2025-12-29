@@ -11,7 +11,7 @@ A comprehensive database schema has been designed for the Event Management Platf
 
 ## Design Highlights
 
-### 1. Entity Model (8 Tables)
+### 1. Entity Model (13 Tables)
 
 | Table | Purpose | Key Features |
 |-------|---------|--------------|
@@ -23,6 +23,11 @@ A comprehensive database schema has been designed for the Event Management Platf
 | `participants` | User-room membership | Role-based, metadata support, unique constraint |
 | `prizes` | Prize fund | Quantity tracking, soft delete, flexible metadata |
 | `winners` | Winner records | Prize allocation, audit trail, soft delete |
+| `subscription_plans` | Subscription tiers | Pricing, features, Stripe integration |
+| `subscriptions` | User subscriptions | Status tracking, billing periods, trial support |
+| `payments` | Payment records | Transaction history, Stripe integration, refunds |
+| `invoices` | Billing invoices | Invoice generation, PDF support, line items |
+| `usage_records` | Usage tracking | Metered billing, feature usage, analytics |
 
 ### 2. Data Integrity
 
@@ -91,14 +96,34 @@ Flexible data storage without schema migrations:
 - `PARTICIPANT` - Event participant
 - `VIEWER` - Observer without participation
 
+**SubscriptionPlanTier:**
+- `FREE` - Free tier with limited features
+- `PRO` - Professional tier with advanced features
+- `ENTERPRISE` - Enterprise tier with unlimited features
+- `CUSTOM` - Custom pricing for special cases
+
+**SubscriptionStatus:**
+- `TRIALING` - In trial period
+- `ACTIVE` - Subscription is active and paid
+- `PAST_DUE` - Payment failed, grace period
+- `CANCELED` - Canceled but still active until period end
+- `EXPIRED` - Subscription ended
+- `INCOMPLETE` - Initial payment not completed
+- `PAUSED` - Temporarily paused (optional feature)
+
+**BillingInterval:**
+- `MONTHLY` - Monthly billing
+- `YEARLY` - Yearly billing
+- `LIFETIME` - One-time payment
+
 ### 6. Indexing Strategy
 
-**45 Total Indexes:**
-- 8 Primary key indexes (automatic)
-- 11 Foreign key indexes (automatic)
-- 8 Unique constraint indexes
-- 13 Single-column indexes (status, role, timestamps, token lookups, manifest versions)
-- 5 Composite indexes (common query patterns)
+**79 Total Indexes:**
+- 13 Primary key indexes (automatic)
+- 16 Foreign key indexes (automatic)
+- 14 Unique constraint indexes
+- 28 Single-column indexes (status, role, timestamps, token lookups, manifest versions, billing fields)
+- 8 Composite indexes (common query patterns)
 
 **Composite Indexes:**
 1. `rooms(status, isPublic, appId)` - Room listing optimization
@@ -106,6 +131,9 @@ Flexible data storage without schema migrations:
 3. `winners(roomId, prizeId)` - Prize distribution tracking
 4. `rooms(appId, appManifestVersion)` - Query rooms by app and version
 5. `users(provider, providerId)` - OAuth lookup optimization
+6. `subscriptions(status, currentPeriodEnd)` - Expiring subscriptions
+7. `subscriptions(userId, status, deletedAt)` - Active user subscription
+8. `usage_records(subscriptionId, metricName, timestamp)` - Usage aggregation
 
 **Manifest Versioning Indexes:**
 - `apps(manifestVersion)` - Query apps by version
@@ -131,14 +159,15 @@ Schema optimized for:
 
 | Metric | Count |
 |--------|-------|
-| Tables | 8 |
-| Enums | 2 |
-| Relations | 13 |
-| Indexes | 45 |
-| JSON Fields | 6 |
-| Soft Deletes | 6 |
-| Unique Constraints | 6 |
+| Tables | 13 |
+| Enums | 5 |
+| Relations | 20 |
+| Indexes | 79 |
+| JSON Fields | 11 |
+| Soft Deletes | 11 |
+| Unique Constraints | 14 |
 | Versioned Fields | 3 (App.manifestVersion, App.manifestHistory, Room.appManifestVersion) |
+| Stripe Fields | 9 (Full Stripe integration support) |
 
 ## API Alignment
 
@@ -155,6 +184,10 @@ Schema fully supports all endpoints defined in:
 - ✅ Participant management with roles
 - ✅ Prize fund management
 - ✅ Winner selection with validation
+- ✅ Subscription management (NEW)
+- ✅ Payment processing (NEW)
+- ✅ Invoice generation (NEW)
+- ✅ Usage tracking for metered billing (NEW)
 
 ## Security Features
 
@@ -167,6 +200,8 @@ Schema fully supports all endpoints defined in:
 7. **Soft Deletes** - Data preservation for audit trails
 8. **Input Validation** - Enforced by Prisma schema
 9. **SQL Injection Prevention** - Prisma parameterized queries
+10. **Payment Security** - Stripe integration for PCI compliance (NEW)
+11. **Subscription Lifecycle** - Proper handling of trial, active, canceled states (NEW)
 
 ## Performance Characteristics
 
@@ -251,12 +286,20 @@ Schema fully supports all endpoints defined in:
 - [ ] Notification preferences
 - [ ] Audit log table
 
-### Phase 3 (Future)
+### Phase 3 (Completed) ✅
+- [x] Billing and subscriptions - **COMPLETED**
+- [x] Payment processing with Stripe - **COMPLETED**
+- [x] Invoice generation - **COMPLETED**
+- [x] Usage tracking for metered billing - **COMPLETED**
+
+### Phase 4 (Future)
 - [ ] File uploads (avatars, prize images)
 - [ ] Analytics tables (room views, participation stats)
-- [ ] Billing and subscriptions
 - [ ] Multi-tenant support
 - [ ] Data export functionality
+- [ ] Subscription webhooks implementation
+- [ ] Automated dunning (failed payment retries)
+- [ ] Subscription upgrade/downgrade flows
 
 ## Maintenance Plan
 

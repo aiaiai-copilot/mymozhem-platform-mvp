@@ -35,6 +35,7 @@ model User {
   participations Participant[]
   createdRooms   Room[]        @relation("RoomOrganizer")
   sessions       Session[]
+  subscriptions  Subscription[]
 
   @@unique([provider, providerId])
   @@index([email])
@@ -269,4 +270,239 @@ model Winner {
   @@index([deletedAt])
   @@index([roomId, prizeId]) // Common query pattern
   @@map("winners")
+}
+
+// ============================================================================
+// BILLING & SUBSCRIPTIONS
+// ============================================================================
+
+enum SubscriptionPlanTier {
+  FREE
+  PRO
+  ENTERPRISE
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  TRIALING      // In trial period
+  ACTIVE        // Subscription is active and paid
+  PAST_DUE      // Payment failed, grace period
+  CANCELED      // Canceled but still active until period end
+  EXPIRED       // Subscription ended
+  INCOMPLETE    // Initial payment not completed
+  PAUSED        // Temporarily paused (optional feature)
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+  LIFETIME
+}
+
+model SubscriptionPlan {
+  id   String                @id @default(cuid())
+  tier SubscriptionPlanTier
+
+  // Plan details
+  name        String // "Free Plan", "Pro Monthly", "Enterprise Yearly"
+  description String?
+  isActive    Boolean @default(true) // Can new users subscribe to this plan?
+
+  // Pricing
+  price           Int             @default(0) // Price in cents (e.g., 2999 = $29.99)
+  currency        String          @default("USD")
+  billingInterval BillingInterval @default(MONTHLY)
+
+  // Feature limits (JSON for flexibility)
+  features Json // { "maxRooms": 10, "maxParticipantsPerRoom": 100, "apps": ["app_lottery_v1"] }
+
+  // Stripe integration (optional)
+  stripePriceId   String? @unique // Stripe Price ID (price_xxx)
+  stripeProductId String? // Stripe Product ID (prod_xxx)
+
+  // Metadata
+  displayOrder Int     @default(0) // For UI sorting (Free=0, Pro=1, Enterprise=2)
+  metadata     Json    @default("{}") // Additional plan metadata
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete (keep for historical subscriptions)
+
+  // Relations
+  subscriptions Subscription[]
+
+  @@unique([tier, billingInterval]) // One plan per tier+interval combination
+  @@index([tier])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@index([displayOrder])
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  planId String
+
+  // Subscription status
+  status SubscriptionStatus @default(TRIALING)
+
+  // Billing period
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+
+  // Cancellation
+  cancelAtPeriodEnd Boolean   @default(false)
+  canceledAt        DateTime?
+  cancelReason      String? // User feedback on cancellation
+
+  // Trial
+  trialStart DateTime?
+  trialEnd   DateTime?
+
+  // Stripe integration (optional)
+  stripeCustomerId       String? // Stripe Customer ID (cus_xxx)
+  stripeSubscriptionId   String? @unique // Stripe Subscription ID (sub_xxx)
+  stripeCheckoutSessionId String? // Stripe Checkout Session ID (cs_xxx)
+
+  // Usage tracking
+  metadata Json @default("{}") // Track usage, overage, etc.
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete (keep subscription history)
+
+  // Relations
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  payments       Payment[]
+  invoices       Invoice[]
+  usageRecords   UsageRecord[]
+
+  @@unique([userId, status, deletedAt]) // User can have only one active subscription
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd]) // For expiration checks
+  @@index([trialEnd]) // For trial expiration notifications
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([deletedAt])
+  @@index([status, currentPeriodEnd]) // Common query pattern
+  @@map("subscriptions")
+}
+
+model Payment {
+  id             String @id @default(cuid())
+  subscriptionId String
+  userId         String
+
+  // Payment details
+  amount          Int    // Amount in cents
+  currency        String @default("USD")
+  status          String // succeeded, pending, failed, refunded
+  paymentMethod   String? // card, bank_transfer, etc.
+  failureReason   String? // Reason if payment failed
+
+  // Stripe integration
+  stripePaymentIntentId String? @unique // Stripe PaymentIntent ID (pi_xxx)
+  stripeChargeId        String? // Stripe Charge ID (ch_xxx)
+
+  // Metadata
+  metadata Json @default("{}") // Additional payment info
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([stripePaymentIntentId])
+  @@index([deletedAt])
+  @@map("payments")
+}
+
+model Invoice {
+  id             String @id @default(cuid())
+  subscriptionId String
+  userId         String
+
+  // Invoice details
+  invoiceNumber String  @unique // INV-2025-001
+  amount        Int // Amount in cents
+  currency      String  @default("USD")
+  status        String // draft, open, paid, void, uncollectible
+
+  // Dates
+  issuedAt DateTime @default(now())
+  dueAt    DateTime
+  paidAt   DateTime?
+
+  // Stripe integration
+  stripeInvoiceId String? @unique // Stripe Invoice ID (in_xxx)
+
+  // PDF
+  pdfUrl String? // URL to generated invoice PDF
+
+  // Line items
+  lineItems Json @default("[]") // Array of invoice line items
+
+  // Metadata
+  metadata Json @default("{}") // Additional invoice info
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([userId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([issuedAt])
+  @@index([dueAt])
+  @@index([stripeInvoiceId])
+  @@index([deletedAt])
+  @@map("invoices")
+}
+
+model UsageRecord {
+  id             String @id @default(cuid())
+  subscriptionId String
+  userId         String
+
+  // Usage tracking
+  metricName  String // "rooms_created", "participants_added", "api_calls"
+  quantity    Int // Number of units used
+  timestamp   DateTime @default(now())
+
+  // Metadata
+  metadata Json @default("{}") // Additional context (roomId, appId, etc.)
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([userId])
+  @@index([metricName])
+  @@index([timestamp])
+  @@index([deletedAt])
+  @@index([subscriptionId, metricName, timestamp]) // For aggregation queries
+  @@map("usage_records")
 }
