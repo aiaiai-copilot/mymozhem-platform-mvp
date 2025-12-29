@@ -259,67 +259,48 @@ Total: 88 automated checks in < 10 seconds
   - Backward and forward compatibility
   - Safe evolution path for applications
 
-### 9. Billing and Subscription System ✅
+### 9. MVP Scope Cleanup ✅
 
-**Addressed audit criticism about missing billing/subscription schema:**
+**Reverted billing implementation - deferred to post-MVP:**
 
-- ✅ **Problem Identified**
-  - Project documentation mentions "Billing and subscriptions" as platform responsibility
-  - Current schema had no Subscription, Plan, or Payment models
-  - Critical for freemium model and platform monetization
-  - No way to track user subscriptions or enforce limits
+- ✅ **Decision Made**
+  - Billing/subscriptions not needed for MVP validation
+  - Will be implemented AFTER platform proves value
+  - MVP will be FREE for all users - no restrictions
+  - Cleaner, simpler schema for initial launch
 
-- ✅ **Comprehensive Solution Implemented**
-  - **5 New Database Tables:**
-    - SubscriptionPlan: Pricing tiers (Free, Pro, Enterprise, Custom)
-    - Subscription: User subscription management with lifecycle
-    - Payment: Transaction history with Stripe integration
-    - Invoice: Billing invoice tracking with PDF support
-    - UsageRecord: Feature usage tracking for metered billing
-  - **3 New Enums:**
-    - SubscriptionPlanTier (FREE, PRO, ENTERPRISE, CUSTOM)
-    - SubscriptionStatus (TRIALING, ACTIVE, PAST_DUE, CANCELED, EXPIRED, etc.)
-    - BillingInterval (MONTHLY, YEARLY, LIFETIME)
-  - **34 New Strategic Indexes** for optimal query performance
+- ✅ **Removed from Schema**
+  - Deleted 5 billing tables (SubscriptionPlan, Subscription, Payment, Invoice, UsageRecord)
+  - Deleted 3 billing enums (SubscriptionPlanTier, SubscriptionStatus, BillingInterval)
+  - Removed 34 billing indexes
+  - Removed 7 billing relations
+  - **Reduced schema from 509 to 280 lines (45% reduction)**
 
-- ✅ **Schema Evolution**
-  - Tables: 8 → 13 (+5 billing tables)
-  - Enums: 2 → 5 (+3 billing enums)
-  - Relations: 13 → 20 (+7 billing relations)
-  - Indexes: 45 → 79 (+34 billing indexes)
-  - JSON Fields: 6 → 11 (+5 feature definitions)
+- ✅ **Schema Reverted to MVP Core**
+  - Back to 8 essential tables
+  - Back to 2 enums (RoomStatus, ParticipantRole)
+  - Back to 45 strategic indexes
+  - Back to 11 relations
+  - Clean, focused, MVP-ready
 
-- ✅ **Freemium Tiers Defined**
-  - **Free:** $0/mo, 3 rooms, 50 participants/room, basic features
-  - **Pro Monthly:** $29.99/mo, 50 rooms, 500 participants/room, advanced features
-  - **Pro Yearly:** $288/yr, same as monthly + 20% discount
-  - **Enterprise:** $999/yr, unlimited rooms/participants, custom integrations, SLA 99.9%
+- ✅ **Documentation Cleanup**
+  - Deleted: 4 billing documentation files (2,627 lines removed)
+  - Updated: SCHEMA_SUMMARY, QUERY_EXAMPLES, MIGRATION_PLAN (marked billing as POST-MVP)
+  - Created: MVP_SCOPE.md (decision documentation)
+  - Created: SCHEMA_VISUAL.md (clean schema overview)
+  - Preserved billing queries as comments for future reference
 
-- ✅ **Production Features**
-  - Full Stripe integration (Checkout, webhooks, Customer Portal)
-  - Subscription lifecycle management (trial → active → canceled → expired)
-  - Usage tracking for analytics and metered billing
-  - Payment history and audit trail
-  - Soft deletes for data preservation
-  - Trial periods (14-30 days)
-  - Cancellation with reasons tracking
-  - Automatic limit enforcement
+- ✅ **MVP Access Model**
+  - All users: FREE access to ALL features
+  - No restrictions on rooms, participants, or prizes
+  - No payment processing
+  - Focus on platform validation before monetization
 
-- ✅ **Documentation Created**
-  - Created: 4 comprehensive billing guides (1,800+ lines)
-  - Updated: 3 existing files (schema, queries, migration)
-  - Complete Stripe integration guide
-  - API endpoint specifications
-  - Testing checklist and rollout plan
-  - Monitoring and analytics queries
-
-- ✅ **Production Guarantees**
-  - Backward compatible (existing users → Free plan)
-  - Stripe-ready with webhook handlers
-  - Complete audit trail for finance/compliance
-  - Feature limits enforced at database level
-  - MRR/ARR analytics built-in
-  - Scalable to millions of subscriptions
+- ✅ **Future-Proofing**
+  - Billing documentation preserved for future implementation
+  - Architecture supports adding billing later
+  - Migration plan documented in comments
+  - Clean separation maintained
 
 ---
 
@@ -454,25 +435,24 @@ e978839 Design complete REST API and WebSocket protocol
 37. `platform/prisma/MANIFEST_VERSIONING.md` - Complete versioning guide (1200 lines)
 38. `MANIFEST_VERSIONING_SUMMARY.md` - Executive summary (400 lines)
 
-**Billing & Subscription Documentation (4 files):**
-39. `platform/prisma/BILLING_SUBSCRIPTION.md` - Complete billing reference (800 lines)
-40. `platform/prisma/BILLING_QUICK_START.md` - Quick start guide (400 lines)
-41. `platform/prisma/BILLING_IMPLEMENTATION_SUMMARY.md` - Implementation guide (600 lines)
-42. `HANDOFF_BILLING.md` - Session summary (200 lines)
+**MVP Scope Documentation (3 files):**
+39. `platform/prisma/MVP_SCOPE.md` - MVP decision documentation
+40. `platform/prisma/SCHEMA_VISUAL.md` - Clean schema overview
+41. `HANDOFF_MVP_CLEANUP.md` - MVP cleanup session summary
 
-**Total: 42 files created**
+**Total: 41 files created**
 
 ---
 
 ## What's Complete
 
 ### ✅ Database Schema
-- **13 production-ready models** (User, Session, TokenBlacklist, App, Room, Participant, Prize, Winner, SubscriptionPlan, Subscription, Payment, Invoice, UsageRecord)
-- **5 enums** (RoomStatus, ParticipantRole, SubscriptionPlanTier, SubscriptionStatus, BillingInterval)
-- **79 strategic indexes** (optimized for auth, versioning, billing, queries)
-- **20 relations** between entities
+- **8 MVP-focused models** (User, Session, TokenBlacklist, App, Room, Participant, Prize, Winner)
+- **2 enums** (RoomStatus, ParticipantRole)
+- **45 strategic indexes** (optimized for auth, versioning, queries)
+- **11 relations** between entities
 - Soft deletes, timestamps, audit trails
-- JSON fields for flexible data (manifest, settings, metadata, version history, features)
+- JSON fields for flexible data (manifest, settings, metadata, version history)
 - All relationships properly defined
 - Cascade rules for data integrity
 - **JWT-optimized authentication (Current Session)**
@@ -485,13 +465,11 @@ e978839 Design complete REST API and WebSocket protocol
   - Room table: appManifestVersion (locks to creation version)
   - Complete version history and audit trail
   - Rooms never break when apps update
-- **Billing & subscription system (Current Session)**
-  - SubscriptionPlan table: 4 tiers (Free, Pro, Enterprise, Custom)
-  - Subscription table: lifecycle management (trial → active → canceled)
-  - Payment & Invoice tables: complete transaction history
-  - UsageRecord table: feature usage tracking
-  - Full Stripe integration ready
-  - MRR/ARR analytics built-in
+- **MVP scope (Current Session)**
+  - FREE access for all users
+  - No payment restrictions
+  - Billing deferred to post-MVP
+  - Clean, focused schema (280 lines)
 
 ### ✅ Validation System
 - 88 automated checks
@@ -716,10 +694,11 @@ pnpm type-check          # TypeScript check
 ## Key Files to Reference
 
 ### Schema Design
-- `platform/prisma/schema.prisma` - The schema (13 models, 79 indexes, 20 relations)
+- `platform/prisma/schema.prisma` - The schema (8 models, 45 indexes, 11 relations, 280 lines)
 - `platform/prisma/SCHEMA_SUMMARY.md` - Executive summary
 - `platform/prisma/QUERY_EXAMPLES.md` - 50+ Prisma query examples
-- `platform/prisma/MIGRATION_PLAN.md` - Migration strategy with auth, versioning & billing
+- `platform/prisma/MIGRATION_PLAN.md` - Migration strategy with auth & versioning
+- `platform/prisma/SCHEMA_VISUAL.md` - Visual schema overview
 
 ### Authentication & Security
 - `docs/api/authentication.md` - Auth flows (redesigned for JWT performance)
@@ -731,11 +710,9 @@ pnpm type-check          # TypeScript check
 - `MANIFEST_VERSIONING_SUMMARY.md` - Executive summary (400 lines)
 - `docs/api/app-manifest.md` - Manifest format with versioning requirements
 
-### Billing & Subscriptions
-- `platform/prisma/BILLING_SUBSCRIPTION.md` - Complete billing reference (800 lines)
-- `platform/prisma/BILLING_QUICK_START.md` - Quick start guide (400 lines)
-- `platform/prisma/BILLING_IMPLEMENTATION_SUMMARY.md` - Implementation guide (600 lines)
-- `HANDOFF_BILLING.md` - Billing session summary (200 lines)
+### MVP Scope
+- `platform/prisma/MVP_SCOPE.md` - MVP decision documentation
+- `HANDOFF_MVP_CLEANUP.md` - MVP cleanup session summary
 
 ### API Design
 - `docs/api/rest-endpoints.md` - All 28+ endpoints (versioned with `/api/v1/`)
@@ -782,13 +759,12 @@ pnpm type-check          # TypeScript check
 ✅ **Database schema designed and validated (88 checks passed)**
 ✅ **Database schema optimized for JWT performance**
 ✅ **Database schema with manifest versioning system**
-✅ **Database schema with billing & subscription system**
+✅ **Clean MVP-focused schema (8 models, 280 lines)**
 ✅ **API specification complete with versioning (`/api/v1/`)**
 ✅ **API versioning strategy production-ready**
 ✅ **Webhook resilience design complete**
 ✅ **Authentication redesigned for high performance**
 ✅ **Manifest versioning preventing breaking changes**
-✅ **Freemium billing model ready for monetization**
 ✅ **Documentation organized**
 ✅ **Validation automated**
 
@@ -797,20 +773,21 @@ pnpm type-check          # TypeScript check
 2. ✅ **Webhook Resilience** - Timeout protection, circuit breaker, fallback strategies, async patterns
 3. ✅ **JWT Authentication Performance** - Signature validation only (no DB lookup), 99.8% reduction in auth queries
 4. ✅ **Manifest Versioning** - Rooms locked to creation version, apps can evolve without breaking existing rooms
-5. ✅ **Billing & Subscriptions** - Complete freemium system with 4 tiers, Stripe integration, usage tracking
+5. ⏭️ **Billing & Subscriptions** - Deferred to post-MVP (MVP will be FREE for all users)
 
-**Production Ready:**
+**MVP Ready:**
 - Third-party developer integrations supported
 - Users protected from slow/failing apps (never wait >5s)
 - High-performance authentication (10-20x faster validation)
 - Complete observability and monitoring
 - Scalable architecture (PostgreSQL → Redis path documented)
 - Safe app evolution (manifest versioning with full history)
-- Monetization ready (freemium model, Stripe integration, MRR/ARR tracking)
+- FREE access for all users during MVP validation
+- Clean, focused schema ready for implementation
 
 **Recommended next action:** Set up database and run migrations to validate schema with real PostgreSQL.
 
 ---
 
-**Last Updated:** December 29, 2025
-**Session Status:** Complete - All five audit feedbacks addressed, ready for database setup or API implementation
+**Last Updated:** December 30, 2025
+**Session Status:** Complete - MVP scope defined, billing deferred to post-MVP, ready for database setup or API implementation

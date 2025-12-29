@@ -7,27 +7,24 @@
 
 ## Executive Summary
 
-A comprehensive database schema has been designed for the Event Management Platform, supporting OAuth authentication, application integration, room management, participant tracking, prize distribution, and winner selection.
+A clean MVP database schema has been designed for the Event Management Platform, supporting OAuth authentication, application integration, room management, participant tracking, prize distribution, and winner selection.
+
+**MVP Scope:** All users have free access to all features. Billing and subscription features will be implemented post-MVP after platform validation with real users.
 
 ## Design Highlights
 
-### 1. Entity Model (13 Tables)
+### 1. Entity Model (8 Tables)
 
 | Table | Purpose | Key Features |
 |-------|---------|--------------|
 | `users` | User accounts | OAuth support, soft delete, email uniqueness |
 | `sessions` | Auth sessions | Refresh token storage, session metadata, device tracking |
 | `token_blacklist` | Revoked tokens | Access token revocation, automatic cleanup, audit trail |
-| `apps` | Registered applications | Manifest JSON, credentials, activation status |
-| `rooms` | Events/rooms | App integration, status workflow, public/private |
+| `apps` | Registered applications | Manifest JSON, credentials, activation status, versioning |
+| `rooms` | Events/rooms | App integration, status workflow, public/private, version locking |
 | `participants` | User-room membership | Role-based, metadata support, unique constraint |
 | `prizes` | Prize fund | Quantity tracking, soft delete, flexible metadata |
 | `winners` | Winner records | Prize allocation, audit trail, soft delete |
-| `subscription_plans` | Subscription tiers | Pricing, features, Stripe integration |
-| `subscriptions` | User subscriptions | Status tracking, billing periods, trial support |
-| `payments` | Payment records | Transaction history, Stripe integration, refunds |
-| `invoices` | Billing invoices | Invoice generation, PDF support, line items |
-| `usage_records` | Usage tracking | Metered billing, feature usage, analytics |
 
 ### 2. Data Integrity
 
@@ -96,34 +93,14 @@ Flexible data storage without schema migrations:
 - `PARTICIPANT` - Event participant
 - `VIEWER` - Observer without participation
 
-**SubscriptionPlanTier:**
-- `FREE` - Free tier with limited features
-- `PRO` - Professional tier with advanced features
-- `ENTERPRISE` - Enterprise tier with unlimited features
-- `CUSTOM` - Custom pricing for special cases
-
-**SubscriptionStatus:**
-- `TRIALING` - In trial period
-- `ACTIVE` - Subscription is active and paid
-- `PAST_DUE` - Payment failed, grace period
-- `CANCELED` - Canceled but still active until period end
-- `EXPIRED` - Subscription ended
-- `INCOMPLETE` - Initial payment not completed
-- `PAUSED` - Temporarily paused (optional feature)
-
-**BillingInterval:**
-- `MONTHLY` - Monthly billing
-- `YEARLY` - Yearly billing
-- `LIFETIME` - One-time payment
-
 ### 6. Indexing Strategy
 
-**79 Total Indexes:**
-- 13 Primary key indexes (automatic)
-- 16 Foreign key indexes (automatic)
-- 14 Unique constraint indexes
-- 28 Single-column indexes (status, role, timestamps, token lookups, manifest versions, billing fields)
-- 8 Composite indexes (common query patterns)
+**45 Total Indexes:**
+- 8 Primary key indexes (automatic)
+- 11 Foreign key indexes (automatic)
+- 8 Unique constraint indexes
+- 13 Single-column indexes (status, role, timestamps, token lookups, manifest versions)
+- 5 Composite indexes (common query patterns)
 
 **Composite Indexes:**
 1. `rooms(status, isPublic, appId)` - Room listing optimization
@@ -131,9 +108,6 @@ Flexible data storage without schema migrations:
 3. `winners(roomId, prizeId)` - Prize distribution tracking
 4. `rooms(appId, appManifestVersion)` - Query rooms by app and version
 5. `users(provider, providerId)` - OAuth lookup optimization
-6. `subscriptions(status, currentPeriodEnd)` - Expiring subscriptions
-7. `subscriptions(userId, status, deletedAt)` - Active user subscription
-8. `usage_records(subscriptionId, metricName, timestamp)` - Usage aggregation
 
 **Manifest Versioning Indexes:**
 - `apps(manifestVersion)` - Query apps by version
@@ -159,15 +133,14 @@ Schema optimized for:
 
 | Metric | Count |
 |--------|-------|
-| Tables | 13 |
-| Enums | 5 |
-| Relations | 20 |
-| Indexes | 79 |
-| JSON Fields | 11 |
-| Soft Deletes | 11 |
-| Unique Constraints | 14 |
+| Tables | 8 |
+| Enums | 2 |
+| Relations | 11 |
+| Indexes | 45 |
+| JSON Fields | 6 |
+| Soft Deletes | 8 |
+| Unique Constraints | 8 |
 | Versioned Fields | 3 (App.manifestVersion, App.manifestHistory, Room.appManifestVersion) |
-| Stripe Fields | 9 (Full Stripe integration support) |
 
 ## API Alignment
 
@@ -176,7 +149,7 @@ Schema fully supports all endpoints defined in:
 - `docs/api/authentication.md` - OAuth and app auth flows
 - `docs/api/websocket-protocol.md` - Real-time event data
 
-**API Coverage:**
+**API Coverage (MVP):**
 - ✅ User management
 - ✅ Session management
 - ✅ App registration & authentication
@@ -184,10 +157,12 @@ Schema fully supports all endpoints defined in:
 - ✅ Participant management with roles
 - ✅ Prize fund management
 - ✅ Winner selection with validation
-- ✅ Subscription management (NEW)
-- ✅ Payment processing (NEW)
-- ✅ Invoice generation (NEW)
-- ✅ Usage tracking for metered billing (NEW)
+
+**Post-MVP:**
+- ⏳ Subscription management (after platform validation)
+- ⏳ Payment processing (after platform validation)
+- ⏳ Invoice generation (after platform validation)
+- ⏳ Usage tracking for metered billing (after platform validation)
 
 ## Security Features
 
@@ -200,8 +175,6 @@ Schema fully supports all endpoints defined in:
 7. **Soft Deletes** - Data preservation for audit trails
 8. **Input Validation** - Enforced by Prisma schema
 9. **SQL Injection Prevention** - Prisma parameterized queries
-10. **Payment Security** - Stripe integration for PCI compliance (NEW)
-11. **Subscription Lifecycle** - Proper handling of trial, active, canceled states (NEW)
 
 ## Performance Characteristics
 
@@ -286,20 +259,20 @@ Schema fully supports all endpoints defined in:
 - [ ] Notification preferences
 - [ ] Audit log table
 
-### Phase 3 (Completed) ✅
-- [x] Billing and subscriptions - **COMPLETED**
-- [x] Payment processing with Stripe - **COMPLETED**
-- [x] Invoice generation - **COMPLETED**
-- [x] Usage tracking for metered billing - **COMPLETED**
+### Phase 3 (Post-MVP - After Validation)
+- [ ] Billing and subscriptions system
+- [ ] Payment processing with Stripe
+- [ ] Invoice generation
+- [ ] Usage tracking for metered billing
+- [ ] Subscription webhooks implementation
+- [ ] Automated dunning (failed payment retries)
+- [ ] Subscription upgrade/downgrade flows
 
 ### Phase 4 (Future)
 - [ ] File uploads (avatars, prize images)
 - [ ] Analytics tables (room views, participation stats)
 - [ ] Multi-tenant support
 - [ ] Data export functionality
-- [ ] Subscription webhooks implementation
-- [ ] Automated dunning (failed payment retries)
-- [ ] Subscription upgrade/downgrade flows
 
 ## Maintenance Plan
 

@@ -99,15 +99,17 @@ The migration will create:
    - `RoomStatus` (DRAFT, ACTIVE, COMPLETED, CANCELLED)
    - `ParticipantRole` (ADMIN, ORGANIZER, MODERATOR, PARTICIPANT, VIEWER)
 
-2. **Tables:**
+2. **Tables (8 Core MVP Tables):**
    - `users` - User accounts with OAuth data
    - `sessions` - Refresh token storage with session metadata
    - `token_blacklist` - Revoked access tokens (blacklist pattern)
-   - `apps` - Registered applications with manifests
-   - `rooms` - Event/room records
+   - `apps` - Registered applications with manifests and versioning
+   - `rooms` - Event/room records with manifest version locking
    - `participants` - User participation in rooms
    - `prizes` - Prize records
    - `winners` - Winner records
+
+**Note:** Billing tables (subscription_plans, subscriptions, payments, invoices, usage_records) will be added POST-MVP after platform validation.
 
 3. **Indexes:**
    - Foreign key indexes (automatic)
@@ -737,9 +739,15 @@ async function isTokenBlacklisted(token: string): Promise<boolean> {
 - Session table (refresh tokens) - needed for rotation
 - Blacklist audit trail (optional) - for compliance
 
-## Billing & Subscription Migration
+## Billing & Subscription Migration (POST-MVP)
 
-### Adding Billing Models
+**Status:** Deferred until after MVP validation with real users.
+
+**Rationale:** The platform will launch with free access for all users. After validating the core product-market fit, we'll design and implement a proper monetization strategy based on actual user behavior and needs.
+
+### Future Billing Implementation (Reference)
+
+When billing is needed POST-MVP, the following will be added:
 
 **Migration Name:** `add_billing_subscription`
 
@@ -754,15 +762,19 @@ async function isTokenBlacklisted(token: string): Promise<boolean> {
 8. Add `UsageRecord` table
 9. Add relation from `User` to `Subscription`
 
-**Migration Steps:**
+**Note:** This section is for future reference only. Do not implement billing for MVP.
+
+**Future Migration Steps (Reference Only):**
+
+<!--
 
 ```bash
-# Create migration
+# FUTURE: Create migration when implementing billing
 cd platform
 npx prisma migrate dev --name add_billing_subscription
 ```
 
-**Generated SQL Summary:**
+**Future Generated SQL Summary:**
 
 ```sql
 -- Create enums
@@ -1042,6 +1054,8 @@ maintenanceSubscriptions()
 # Run daily at 2 AM
 0 2 * * * cd /app/platform && node dist/scripts/subscription-maintenance.js
 ```
+
+-->
 
 ## Resources
 

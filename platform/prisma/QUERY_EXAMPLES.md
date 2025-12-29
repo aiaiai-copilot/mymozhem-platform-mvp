@@ -1579,6 +1579,13 @@ async function getVersionAnalytics(appId: string) {
 
 ## Billing & Subscription Queries
 
+**NOTE:** Billing and subscription features will be implemented POST-MVP.
+For MVP, all users have free access to all features.
+
+The following queries are for reference only and will be implemented later:
+
+<!--
+
 ### Create Subscription Plan
 
 ```typescript
@@ -2124,6 +2131,8 @@ for (const sub of pendingDowngrades) {
   }
 }
 ```
+
+-->
 
 ---
 
