@@ -11,6 +11,8 @@ Complete REST API and WebSocket protocol documentation for the Event Management 
 - [API Versioning Strategy](./versioning-strategy.md) - Version management and migration
 - [Design Decisions](./design-decisions.md) - Architecture rationale
 - [App Manifest Specification](./app-manifest.md) - Application integration guide
+- [Webhook Resilience](./webhook-resilience.md) - Timeout, circuit breaker & retry patterns
+- [Webhook Quick Guide](./webhook-quick-guide.md) - Developer quick reference for webhooks
 - [OpenAPI Specification](../openapi.yaml) - Machine-readable API spec
 
 ---
@@ -296,6 +298,8 @@ When a room uses an app with `winnerSelection` capability, the platform delegate
 POST {appBaseUrl}/api/v1/platform/winner-selection
 Content-Type: application/json
 X-Platform-Signature: {hmac_signature}
+X-Request-ID: req_xyz789
+X-Timeout-Ms: 5000
 
 {
   "roomId": "room_xyz789",
@@ -307,20 +311,31 @@ X-Platform-Signature: {hmac_signature}
 **App → Platform:**
 ```json
 {
-  "winners": [
-    {
-      "participantId": "part_123abc",
-      "prizeId": "prize_def456",
-      "metadata": {
-        "drawNumber": 1,
-        "algorithm": "random"
+  "success": true,
+  "data": {
+    "winners": [
+      {
+        "participantId": "part_123abc",
+        "prizeId": "prize_def456",
+        "metadata": {
+          "drawNumber": 1,
+          "algorithm": "random"
+        }
       }
-    }
-  ]
+    ]
+  },
+  "processingTime": 1243
 }
 ```
 
-Platform validates and creates winner records, then broadcasts via WebSocket.
+**Platform behavior:**
+- Validates response within timeout (5000ms)
+- Creates winner records
+- Broadcasts via WebSocket
+- On timeout/failure: Falls back to default random selection
+- Logs incident and notifies organizer
+
+**Resilience:** Platform implements timeouts, circuit breakers, and fallback strategies to protect user experience. See [Webhook Resilience](./webhook-resilience.md) for details.
 
 ---
 

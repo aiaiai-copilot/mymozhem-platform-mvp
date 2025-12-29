@@ -172,9 +172,9 @@ List of API permissions the application needs.
 
 ### `webhooks` (optional)
 
-Map of capability names to webhook endpoint paths.
+Map of capability names to webhook endpoint configurations.
 
-**Format:**
+**Format (Simple):**
 ```json
 {
   "webhooks": {
@@ -183,15 +183,73 @@ Map of capability names to webhook endpoint paths.
 }
 ```
 
-**Example:**
+**Format (Advanced with Timeout & Retry):**
 ```json
 {
   "webhooks": {
-    "winnerSelection": "/api/platform/winner-selection",
-    "participantRegistration": "/api/platform/participant-registration"
+    "capability_name": {
+      "path": "/path/to/endpoint",
+      "timeout": 5000,
+      "async": false,
+      "retry": {
+        "enabled": false,
+        "maxAttempts": 1
+      }
+    }
   }
 }
 ```
+
+**Example (Mixed):**
+```json
+{
+  "webhooks": {
+    "winnerSelection": {
+      "path": "/api/platform/winner-selection",
+      "timeout": 5000,
+      "async": false,
+      "retry": {
+        "enabled": false
+      }
+    },
+    "participantRegistration": {
+      "path": "/api/platform/participant-registration",
+      "timeout": 3000,
+      "async": false
+    },
+    "analytics": {
+      "path": "/api/platform/analytics",
+      "timeout": 30000,
+      "async": true,
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 3,
+        "backoff": "exponential"
+      }
+    }
+  }
+}
+```
+
+**Webhook Configuration:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `path` | string | Yes | - | Webhook endpoint path |
+| `timeout` | integer | No | 10000 | Maximum response time in milliseconds |
+| `async` | boolean | No | false | If true, platform queues job and doesn't wait for response |
+| `retry.enabled` | boolean | No | false | Enable automatic retries on failure |
+| `retry.maxAttempts` | integer | No | 3 | Maximum retry attempts (async only) |
+| `retry.backoff` | string | No | "exponential" | Backoff strategy: "exponential" or "linear" |
+
+**Recommended Timeouts by Capability:**
+
+| Capability | Timeout | Rationale |
+|------------|---------|-----------|
+| `winnerSelection` (sync) | 5000ms | Live draw ceremony can tolerate brief delay |
+| `participantRegistration` | 3000ms | Standard web form submission expectation |
+| `notifications` (async) | 30000ms | Can process in background |
+| `analytics` (async) | 30000ms | Non-critical, background processing |
 
 **Webhook Security:**
 Platform includes HMAC signature in `X-Platform-Signature` header:
@@ -200,6 +258,13 @@ HMAC-SHA256(body, appSecret)
 ```
 
 Applications must verify signature before processing.
+
+**Resilience:** See [Webhook Resilience Documentation](./webhook-resilience.md) for details on:
+- Timeout handling
+- Circuit breaker patterns
+- Fallback strategies
+- Retry logic
+- Dead letter queues
 
 ---
 
@@ -503,10 +568,13 @@ When manifest is registered or updated:
 
 **Platform → App:**
 ```http
-POST {baseUrl}{webhooks.winnerSelection}
+POST {baseUrl}{webhooks.winnerSelection.path}
 Content-Type: application/json
 X-Platform-Signature: sha256=abc123...
 X-Request-ID: req_unique_123
+X-Timeout-Ms: 5000
+X-Retry-Attempt: 1
+X-Max-Attempts: 1
 
 {
   "roomId": "room_xyz789",
@@ -529,19 +597,35 @@ X-Request-ID: req_unique_123
 }
 ```
 
-**App → Platform:**
+**App → Platform (Success):**
 ```json
 {
-  "winners": [
-    {
-      "participantId": "part_123abc",
-      "prizeId": "prize_def456",
-      "metadata": {
-        "algorithm": "random",
-        "drawNumber": 1
+  "success": true,
+  "data": {
+    "winners": [
+      {
+        "participantId": "part_123abc",
+        "prizeId": "prize_def456",
+        "metadata": {
+          "algorithm": "random",
+          "drawNumber": 1
+        }
       }
-    }
-  ]
+    ]
+  },
+  "processingTime": 1243
+}
+```
+
+**App → Platform (Error):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PROCESSING_ERROR",
+    "message": "Failed to select winners",
+    "retryable": false
+  }
 }
 ```
 
@@ -550,6 +634,12 @@ X-Request-ID: req_unique_123
 - All prizes exist and have remaining quantity
 - No duplicate participant-prize pairs
 - Creates winner records and broadcasts events
+
+**Timeout Handling:**
+- If app doesn't respond within timeout (default 5000ms)
+- Platform falls back to default random selection
+- Organizer notified of fallback
+- Incident logged for monitoring
 
 ---
 
