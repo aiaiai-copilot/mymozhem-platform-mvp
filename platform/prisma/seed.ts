@@ -84,6 +84,7 @@ async function main() {
       appId: 'app_lottery_v1',
       appSecret: 'sk_live_lottery_secret_abc123def456',
       isActive: true,
+      manifestVersion: '1.0.0',
       manifest: {
         meta: {
           name: 'Holiday Lottery',
@@ -129,6 +130,7 @@ async function main() {
       appId: 'app_quiz_v1',
       appSecret: 'sk_live_quiz_secret_xyz789ghi012',
       isActive: true,
+      manifestVersion: '1.0.0',
       manifest: {
         meta: {
           name: 'Quiz "Who\'s First?"',
@@ -182,6 +184,7 @@ async function main() {
       name: 'New Year Lottery 2025',
       description: 'Win amazing prizes in our annual New Year lottery!',
       appId: lotteryApp.appId,
+      appManifestVersion: lotteryApp.manifestVersion,
       appSettings: {
         ticketCount: 100,
         drawDate: '2025-12-31T23:00:00Z',
@@ -197,6 +200,7 @@ async function main() {
       name: 'Christmas Trivia Quiz',
       description: 'Test your Christmas knowledge and win prizes!',
       appId: quizApp.appId,
+      appManifestVersion: quizApp.manifestVersion,
       appSettings: {
         questionCount: 10,
         timeLimit: 30,
@@ -212,6 +216,7 @@ async function main() {
       name: 'Private Office Lottery (Draft)',
       description: 'Company lottery for employees only',
       appId: lotteryApp.appId,
+      appManifestVersion: lotteryApp.manifestVersion,
       appSettings: {
         ticketCount: 50,
         drawDate: '2026-01-15T18:00:00Z',
@@ -429,18 +434,20 @@ async function main() {
   await prisma.session.create({
     data: {
       userId: alice.id,
-      accessToken: 'test_access_token_alice_' + Date.now(),
       refreshToken: 'test_refresh_token_alice_' + Date.now(),
       expiresAt: oneHourFromNow,
+      deviceInfo: 'Chrome 120.0.0 on Windows 10',
+      ipAddress: '192.168.1.100',
     },
   });
 
   await prisma.session.create({
     data: {
       userId: bob.id,
-      accessToken: 'test_access_token_bob_' + Date.now(),
       refreshToken: 'test_refresh_token_bob_' + Date.now(),
       expiresAt: oneHourFromNow,
+      deviceInfo: 'Firefox 121.0.0 on macOS',
+      ipAddress: '192.168.1.101',
     },
   });
 
