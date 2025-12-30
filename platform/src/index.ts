@@ -6,13 +6,12 @@
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { PrismaClient } from '@prisma/client';
+import rateLimit from '@fastify/rate-limit';
 import { config } from './config/index.js';
+import { prisma } from './db.js';
 
-// Initialize Prisma Client
-export const prisma = new PrismaClient({
-  log: config.nodeEnv === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+// Re-export prisma for backward compatibility
+export { prisma };
 
 // Create Fastify instance
 const fastify = Fastify({
@@ -37,6 +36,14 @@ await fastify.register(cors, {
   credentials: true,
 });
 
+// Register rate limiting
+await fastify.register(rateLimit, {
+  max: 100,
+  timeWindow: '1 minute',
+  // Stricter limits for auth endpoints
+  keyGenerator: (request) => request.ip,
+});
+
 // Register error handler
 import { errorHandler } from './middleware/errorHandler.js';
 fastify.setErrorHandler(errorHandler);
@@ -55,10 +62,16 @@ fastify.get('/health', async () => {
 import { authRoutes } from './routes/auth.js';
 import { userRoutes } from './routes/users.js';
 import { roomRoutes } from './routes/rooms.js';
+import { participantRoutes } from './routes/participants.js';
+import { prizeRoutes } from './routes/prizes.js';
+import { winnerRoutes } from './routes/winners.js';
 
 await fastify.register(authRoutes);
 await fastify.register(userRoutes);
 await fastify.register(roomRoutes);
+await fastify.register(participantRoutes);
+await fastify.register(prizeRoutes);
+await fastify.register(winnerRoutes);
 
 // Start server
 async function start() {

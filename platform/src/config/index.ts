@@ -4,6 +4,8 @@
  * Loads and validates environment variables
  */
 
+import 'dotenv/config';
+
 export const config = {
   // Server
   port: parseInt(process.env.PORT || '3000', 10),

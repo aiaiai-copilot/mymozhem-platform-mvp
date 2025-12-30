@@ -30,7 +30,7 @@ export async function errorHandler(
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Request validation failed',
-        details: error.validation,
+        details: { validation: error.validation },
       },
     };
     return reply.status(400).send(response);

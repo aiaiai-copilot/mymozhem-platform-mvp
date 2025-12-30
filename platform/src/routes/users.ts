@@ -5,8 +5,8 @@
 
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '../index.js';
-import { requireAuth } from '../middleware/auth.js';
+import { prisma } from '../db.js';
+import { requireAuth, requireAuthStrict } from '../middleware/auth.js';
 import type { ApiResponse, AuthenticatedRequest } from '../types/index.js';
 
 // Request validation schemas
@@ -85,8 +85,8 @@ export async function userRoutes(fastify: FastifyInstance) {
     return reply.send(response);
   });
 
-  // DELETE /api/v1/users/:userId (soft delete)
-  fastify.delete('/api/v1/users/:userId', { preHandler: requireAuth }, async (request, reply) => {
+  // DELETE /api/v1/users/:userId (soft delete - uses strict auth)
+  fastify.delete('/api/v1/users/:userId', { preHandler: requireAuthStrict }, async (request, reply) => {
     const authReq = request as AuthenticatedRequest;
     const { userId } = request.params as { userId: string };
 

@@ -14,8 +14,10 @@ import crypto from 'crypto';
  * Validated by signature only - no database lookup required
  */
 export function generateAccessToken(payload: JwtPayload): string {
+  // expiresIn accepts seconds (number) or time span string ('1h', '7d', etc.)
+  const expiresIn = config.jwt.expiresIn;
   return jwt.sign(payload, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn,
+    expiresIn: expiresIn as jwt.SignOptions['expiresIn'],
   });
 }
 

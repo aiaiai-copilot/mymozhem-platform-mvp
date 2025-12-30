@@ -5,9 +5,10 @@
 
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { RoomStatus, ParticipantRole } from '@prisma/client';
-import { prisma } from '../index.js';
+import { RoomStatus, ParticipantRole, Prisma } from '@prisma/client';
+import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { validateAppSettings, formatValidationErrors, AppManifest } from '../utils/validateAppSettings.js';
 import type { ApiResponse, AuthenticatedRequest, PaginationParams } from '../types/index.js';
 
 // Request validation schemas
@@ -177,6 +178,24 @@ export async function roomRoutes(fastify: FastifyInstance) {
       return reply.status(404).send(response);
     }
 
+    // Validate appSettings against app manifest schema
+    const manifest = app.manifest as AppManifest;
+    const validation = validateAppSettings(body.appSettings, manifest);
+
+    if (!validation.valid) {
+      const response: ApiResponse = {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'appSettings does not match app manifest schema',
+          details: {
+            errors: validation.errors,
+            hint: formatValidationErrors(validation.errors),
+          },
+        },
+      };
+      return reply.status(400).send(response);
+    }
+
     // Create room with locked manifest version
     const room = await prisma.room.create({
       data: {
@@ -184,7 +203,7 @@ export async function roomRoutes(fastify: FastifyInstance) {
         description: body.description,
         appId: body.appId,
         appManifestVersion: app.manifestVersion, // Lock to current version
-        appSettings: body.appSettings,
+        appSettings: body.appSettings as Prisma.InputJsonValue,
         isPublic: body.isPublic,
         createdBy: authReq.user.userId,
       },
@@ -241,9 +260,45 @@ export async function roomRoutes(fastify: FastifyInstance) {
       return reply.status(403).send(response);
     }
 
+    // If updating appSettings, validate against manifest
+    if (body.appSettings) {
+      const existingRoom = await prisma.room.findUnique({
+        where: { id: roomId },
+        include: { app: true },
+      });
+
+      if (existingRoom) {
+        const manifest = existingRoom.app.manifest as AppManifest;
+        const validation = validateAppSettings(body.appSettings, manifest);
+
+        if (!validation.valid) {
+          const response: ApiResponse = {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'appSettings does not match app manifest schema',
+              details: {
+                errors: validation.errors,
+                hint: formatValidationErrors(validation.errors),
+              },
+            },
+          };
+          return reply.status(400).send(response);
+        }
+      }
+    }
+
+    // Prepare update data with proper type casting for JSON fields
+    const updateData: Prisma.RoomUpdateInput = {
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.description !== undefined && { description: body.description }),
+      ...(body.status !== undefined && { status: body.status }),
+      ...(body.isPublic !== undefined && { isPublic: body.isPublic }),
+      ...(body.appSettings !== undefined && { appSettings: body.appSettings as Prisma.InputJsonValue }),
+    };
+
     const room = await prisma.room.update({
       where: { id: roomId },
-      data: body,
+      data: updateData,
     });
 
     const response: ApiResponse = {

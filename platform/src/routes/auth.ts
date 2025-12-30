@@ -5,10 +5,10 @@
 
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/jwt.js';
 import type { ApiResponse, AuthenticatedRequest } from '../types/index.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireAuthStrict } from '../middleware/auth.js';
 
 // Request validation schemas
 const LoginSchema = z.object({
@@ -31,6 +31,23 @@ export async function authRoutes(fastify: FastifyInstance) {
     });
 
     if (!user) {
+      const response: ApiResponse = {
+        error: {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid email or password',
+        },
+      };
+      return reply.status(401).send(response);
+    }
+
+    // TODO: DEMO LOGIN - Replace with proper authentication in production
+    // Production options:
+    // 1. OAuth (Google/Yandex) - no password needed, recommended
+    // 2. Password hashing with bcrypt if email/password auth is required
+    //
+    // For demo purposes, accept "password123" for all seeded users
+    const DEMO_PASSWORD = 'password123';
+    if (body.password !== DEMO_PASSWORD) {
       const response: ApiResponse = {
         error: {
           code: 'INVALID_CREDENTIALS',
@@ -120,8 +137,8 @@ export async function authRoutes(fastify: FastifyInstance) {
     return reply.send(response);
   });
 
-  // POST /api/v1/auth/logout
-  fastify.post('/api/v1/auth/logout', { preHandler: requireAuth }, async (request, reply) => {
+  // POST /api/v1/auth/logout (uses strict auth - sensitive operation)
+  fastify.post('/api/v1/auth/logout', { preHandler: requireAuthStrict }, async (request, reply) => {
     const authReq = request as AuthenticatedRequest;
     const authHeader = request.headers.authorization!;
     const token = authHeader.substring(7);
