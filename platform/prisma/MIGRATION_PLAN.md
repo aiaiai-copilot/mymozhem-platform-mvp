@@ -162,7 +162,178 @@ Used for flexibility without schema migrations:
 | Room → Prize | CASCADE | Remove prizes when room deleted |
 | Room → Winner | CASCADE | Remove winners when room deleted |
 | Participant → Winner | CASCADE | Remove winner record if participant removed |
-| Prize → Winner | RESTRICT | Prevent prize deletion if has winners |
+| **Prize → Winner** | **RESTRICT** | **Prevent hard prize deletion if has winners (see Prize Deletion Policy below)** |
+
+### Prize Deletion Policy
+
+**CRITICAL RULE:** Prizes must ONLY be deleted via soft delete (setting `deletedAt` field).
+
+#### Why This Matters
+
+The `Winner → Prize` relation uses `onDelete: Restrict` to protect historical data integrity. If you attempt to hard delete a Prize that has Winners:
+
+```
+Error: P2003 - Foreign key constraint failed on the field
+```
+
+This is **intentional protection** to prevent accidental loss of winner history.
+
+#### Implementation Requirements
+
+All code that deletes prizes MUST:
+
+1. **Use soft delete only** - Set `deletedAt` instead of calling `delete()`
+2. **Validate before deletion** - Check business rules (e.g., can't delete prize with winners)
+3. **Handle Restrict errors** - Catch and explain the error if hard delete is attempted
+
+#### Middleware/Service Layer Validation
+
+Implement in `platform/src/services/prize.service.ts`:
+
+```typescript
+/**
+ * Delete a prize (soft delete)
+ *
+ * @throws {Error} If prize has winners and business rules prevent deletion
+ */
+async function deletePrize(prizeId: string): Promise<Prize> {
+  // 1. Check if prize has active winners
+  const winnerCount = await prisma.winner.count({
+    where: {
+      prizeId: prizeId,
+      deletedAt: null, // Only count active winners
+    },
+  });
+
+  // 2. Business rule: Cannot delete prize with active winners
+  if (winnerCount > 0) {
+    throw new Error(
+      `Cannot delete prize: ${winnerCount} winner(s) exist. ` +
+      `Revoke winners first or soft delete the prize.`
+    );
+  }
+
+  // 3. Perform soft delete
+  return await prisma.prize.update({
+    where: { id: prizeId },
+    data: { deletedAt: new Date() },
+  });
+}
+```
+
+#### Error Handling for Restrict Violations
+
+If a hard delete is attempted (e.g., via admin tool or direct Prisma call):
+
+```typescript
+import { Prisma } from '@prisma/client';
+
+try {
+  // This will fail if winners exist
+  await prisma.prize.delete({
+    where: { id: prizeId },
+  });
+} catch (error) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2003') {
+      // Foreign key constraint violation (onDelete: Restrict)
+      throw new Error(
+        'Cannot hard delete Prize: Winners exist. ' +
+        'Use soft delete instead: ' +
+        'await prisma.prize.update({ where: { id }, data: { deletedAt: new Date() } })'
+      );
+    }
+  }
+  throw error;
+}
+```
+
+#### Database-Level Protection
+
+The database enforces this through foreign key constraints:
+
+```sql
+-- Generated migration includes:
+ALTER TABLE "winners"
+  ADD CONSTRAINT "winners_prizeId_fkey"
+  FOREIGN KEY ("prizeId")
+  REFERENCES "prizes"("id")
+  ON DELETE RESTRICT;
+```
+
+This means:
+- **Database will reject** hard delete of Prize if Winners reference it
+- **Application MUST use** soft delete pattern
+- **No way to bypass** this protection (even with raw SQL)
+
+### Other Models with Restrict Protection
+
+Similar protection exists for other critical relations:
+
+#### User → Room (Organizer)
+
+**Rule:** Cannot hard delete User if they created any Rooms.
+
+```typescript
+// Safe user deletion
+async function deleteUser(userId: string) {
+  // 1. Soft delete all rooms created by user
+  await prisma.room.updateMany({
+    where: { createdBy: userId },
+    data: { deletedAt: new Date() },
+  });
+
+  // 2. Soft delete the user
+  return await prisma.user.update({
+    where: { id: userId },
+    data: { deletedAt: new Date() },
+  });
+}
+```
+
+**Why:** Preserves historical records of who organized events.
+
+#### App → Room
+
+**Rule:** Cannot hard delete App if any Rooms reference it.
+
+```typescript
+// Safe app deletion
+async function deleteApp(appId: string) {
+  // 1. Check for active rooms
+  const activeRoomCount = await prisma.room.count({
+    where: {
+      appId: appId,
+      deletedAt: null,
+    },
+  });
+
+  if (activeRoomCount > 0) {
+    throw new Error(
+      `Cannot delete app: ${activeRoomCount} active room(s) exist. ` +
+      `Soft delete or complete rooms first.`
+    );
+  }
+
+  // 2. Soft delete the app
+  return await prisma.app.update({
+    where: { appId: appId },
+    data: { deletedAt: new Date() },
+  });
+}
+```
+
+**Why:** Prevents deletion of apps that have active or historical rooms.
+
+### Summary: All Restrict Relations
+
+| Parent Model | Child Model | Field | Reason |
+|--------------|-------------|-------|--------|
+| **User** | Room | organizer | Preserve event organizer history |
+| **App** | Room | app | Prevent deletion of apps with rooms |
+| **Prize** | Winner | prize | Preserve winner history and prevent data loss |
+
+All three cases require soft delete pattern for data integrity.
 
 ### Indexes Strategy
 

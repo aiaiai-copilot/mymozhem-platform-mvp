@@ -71,6 +71,35 @@ const user = await prisma.user.update({
 });
 ```
 
+### Safe User Deletion (with Room Protection)
+
+**NOTE:** User deletion is protected by onDelete: Restrict if they created any Rooms.
+
+```typescript
+/**
+ * Safe user deletion with room cleanup
+ */
+async function deleteUserSafely(userId: string) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Soft delete all rooms created by user
+    await tx.room.updateMany({
+      where: { createdBy: userId },
+      data: { deletedAt: new Date() },
+    });
+
+    // 2. Sessions will CASCADE delete automatically
+
+    // 3. Participations will CASCADE delete automatically
+
+    // 4. Soft delete the user
+    return await tx.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date() },
+    });
+  });
+}
+```
+
 ### List Active Users
 
 ```typescript
@@ -356,6 +385,57 @@ const apps = await prisma.app.findMany({
     appId: true,
     manifest: true,
     createdAt: true,
+  },
+});
+```
+
+### Safe App Deletion (with Room Protection)
+
+**NOTE:** App deletion is protected by onDelete: Restrict if any Rooms reference it.
+
+```typescript
+/**
+ * Safe app deletion with room validation
+ */
+async function deleteAppSafely(appId: string) {
+  // 1. Check for active rooms
+  const activeRoomCount = await prisma.room.count({
+    where: {
+      appId: appId,
+      deletedAt: null,
+    },
+  });
+
+  if (activeRoomCount > 0) {
+    throw new Error(
+      `Cannot delete app: ${activeRoomCount} active room(s) exist. ` +
+      `Complete or soft delete all rooms first.`
+    );
+  }
+
+  // 2. Get count of all rooms (including soft-deleted)
+  const totalRoomCount = await prisma.room.count({
+    where: { appId: appId },
+  });
+
+  console.log(`App has ${totalRoomCount} historical room(s)`);
+
+  // 3. Soft delete the app (historical rooms will still reference it)
+  return await prisma.app.update({
+    where: { appId: appId },
+    data: { deletedAt: new Date() },
+  });
+}
+```
+
+### Deactivate App (Keep Registration)
+
+```typescript
+// Deactivate app without deletion
+const app = await prisma.app.update({
+  where: { appId: 'app_lottery_v1' },
+  data: {
+    isActive: false,
   },
 });
 ```
@@ -732,6 +812,130 @@ const prize = await prisma.prize.update({
     },
   },
 });
+```
+
+### Delete Prize (Soft Delete - REQUIRED)
+
+**CRITICAL:** Prizes must ONLY be deleted via soft delete. Hard delete will fail if Winners exist.
+
+```typescript
+// ✅ CORRECT: Soft delete
+const prize = await prisma.prize.update({
+  where: { id: 'prize_def456' },
+  data: {
+    deletedAt: new Date(),
+  },
+});
+```
+
+### Delete Prize with Business Logic Validation
+
+```typescript
+/**
+ * Safe prize deletion with validation
+ */
+async function deletePrizeSafely(prizeId: string) {
+  // 1. Check if prize has active winners
+  const winnerCount = await prisma.winner.count({
+    where: {
+      prizeId: prizeId,
+      deletedAt: null,
+    },
+  });
+
+  // 2. Business rule: Cannot delete prize with active winners
+  if (winnerCount > 0) {
+    throw new Error(
+      `Cannot delete prize: ${winnerCount} winner(s) exist. ` +
+      `Revoke winners first or keep the prize as soft-deleted.`
+    );
+  }
+
+  // 3. Soft delete the prize
+  return await prisma.prize.update({
+    where: { id: prizeId },
+    data: { deletedAt: new Date() },
+  });
+}
+```
+
+### Hard Delete Prize (WRONG - Will Fail)
+
+```typescript
+// ❌ WRONG: Hard delete will fail if winners exist
+try {
+  await prisma.prize.delete({
+    where: { id: 'prize_def456' },
+  });
+} catch (error) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2003') {
+      // Foreign key constraint failed (onDelete: Restrict)
+      console.error('Error: Cannot hard delete Prize with Winners!');
+      console.error('Use soft delete instead:');
+      console.error('await prisma.prize.update({');
+      console.error('  where: { id },');
+      console.error('  data: { deletedAt: new Date() }');
+      console.error('});');
+    }
+  }
+  throw error;
+}
+```
+
+### Restore Soft-Deleted Prize
+
+```typescript
+// Restore a prize that was soft-deleted
+const prize = await prisma.prize.update({
+  where: { id: 'prize_def456' },
+  data: {
+    deletedAt: null, // Clear soft delete flag
+  },
+});
+```
+
+### Delete Prize and Revoke Winners (Transaction)
+
+```typescript
+/**
+ * Delete prize by first revoking all winners
+ */
+async function deletePrizeWithWinners(prizeId: string) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Get prize to check quantity
+    const prize = await tx.prize.findUnique({
+      where: { id: prizeId },
+    });
+
+    // 2. Soft delete all winners
+    const winners = await tx.winner.updateMany({
+      where: {
+        prizeId: prizeId,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    // 3. Restore prize quantity
+    await tx.prize.update({
+      where: { id: prizeId },
+      data: {
+        quantityRemaining: prize.quantity, // Restore full quantity
+      },
+    });
+
+    // 4. Soft delete the prize
+    return await tx.prize.update({
+      where: { id: prizeId },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+  });
+}
 ```
 
 ## Winner Queries
@@ -1149,6 +1353,16 @@ const result = await prisma.$queryRaw`
 8. **Handle unique constraint violations** gracefully
 9. **Use connection pooling** in production
 10. **Monitor query performance** with Prisma's built-in logging
+
+### Deletion Best Practices
+
+11. **Never hard delete protected models** - Prize, User (with rooms), App (with rooms)
+12. **Always use soft delete** for models with historical data (deletedAt field)
+13. **Check Restrict relations** before attempting deletion
+14. **Handle P2003 errors** gracefully with helpful messages
+15. **Validate business rules** before soft deletion (e.g., active winners exist)
+16. **Use transactions** when deleting related data
+17. **Document deletion policies** in service layer
 
 ## Error Handling
 

@@ -15,6 +15,27 @@ datasource db {
 // USERS & AUTHENTICATION
 // ============================================================================
 
+/// User entity with deletion protection
+///
+/// NOTE: User deletion is protected by onDelete: Restrict on Room organizer relation.
+/// Cannot hard delete a User if they created any Rooms (even soft-deleted rooms).
+///
+/// @example Correct deletion:
+/// ```typescript
+/// // 1. Transfer or soft delete user's rooms first
+/// await prisma.room.updateMany({
+///   where: { createdBy: 'usr_abc123' },
+///   data: { deletedAt: new Date() },
+/// });
+///
+/// // 2. Then soft delete the user
+/// await prisma.user.update({
+///   where: { id: 'usr_abc123' },
+///   data: { deletedAt: new Date() },
+/// });
+/// ```
+///
+/// See: platform/prisma/MIGRATION_PLAN.md - Cascade Behavior section
 model User {
   id     String  @id @default(cuid())
   email  String  @unique
@@ -33,7 +54,7 @@ model User {
 
   // Relations
   participations Participant[]
-  createdRooms   Room[]        @relation("RoomOrganizer")
+  createdRooms   Room[]        @relation("RoomOrganizer") // Room → User uses onDelete: Restrict (prevents hard delete if user created rooms)
   sessions       Session[]
 
   @@unique([provider, providerId])
@@ -88,6 +109,27 @@ model TokenBlacklist {
 // APPLICATIONS
 // ============================================================================
 
+/// Application entity with deletion protection
+///
+/// NOTE: App deletion is protected by onDelete: Restrict on Room relation.
+/// Cannot hard delete an App if any Rooms reference it (even soft-deleted rooms).
+///
+/// @example Correct deletion:
+/// ```typescript
+/// // 1. Soft delete all rooms first (or ensure no rooms exist)
+/// await prisma.room.updateMany({
+///   where: { appId: 'app_lottery_v1' },
+///   data: { deletedAt: new Date() },
+/// });
+///
+/// // 2. Then soft delete the app
+/// await prisma.app.update({
+///   where: { appId: 'app_lottery_v1' },
+///   data: { deletedAt: new Date() },
+/// });
+/// ```
+///
+/// See: platform/prisma/MIGRATION_PLAN.md - Cascade Behavior section
 model App {
   id        String @id @default(cuid())
   appId     String @unique // app_lottery_v1
@@ -107,7 +149,7 @@ model App {
   deletedAt DateTime? // Soft delete
 
   // Relations
-  rooms Room[]
+  rooms Room[] // Room → App uses onDelete: Restrict (prevents hard delete if rooms exist)
 
   @@index([appId])
   @@index([isActive])
@@ -212,6 +254,29 @@ model Participant {
 // PRIZES
 // ============================================================================
 
+/// Prize entity with strict deletion policy
+///
+/// CRITICAL: Prize deletion must ONLY be performed via soft delete (deletedAt field).
+/// Hard deletion will fail if any Winner records exist due to onDelete: Restrict.
+///
+/// @example Correct deletion (soft delete):
+/// ```typescript
+/// await prisma.prize.update({
+///   where: { id: 'prize_xyz' },
+///   data: { deletedAt: new Date() },
+/// });
+/// ```
+///
+/// @example Wrong deletion (hard delete - will fail if winners exist):
+/// ```typescript
+/// await prisma.prize.delete({
+///   where: { id: 'prize_xyz' },
+/// });
+/// // Error: P2003 - Foreign key constraint failed (Winner → Prize Restrict)
+/// ```
+///
+/// See: platform/prisma/QUERY_EXAMPLES.md - Prize Deletion section
+/// See: platform/prisma/MIGRATION_PLAN.md - Prize Deletion Policy
 model Prize {
   id          String  @id @default(cuid())
   roomId      String
@@ -229,11 +294,11 @@ model Prize {
   // Timestamps
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // Soft delete
+  deletedAt DateTime? // Soft delete - REQUIRED for Prize deletion
 
   // Relations
   room    Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  winners Winner[]
+  winners Winner[] // Winner → Prize uses onDelete: Restrict (prevents hard delete if winners exist)
 
   @@index([roomId])
   @@index([deletedAt])
