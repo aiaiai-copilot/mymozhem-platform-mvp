@@ -5,8 +5,10 @@
  */
 
 import Ajv, { ErrorObject } from 'ajv';
+import addFormats from 'ajv-formats';
 
 const ajv = new Ajv({ allErrors: true });
+addFormats(ajv);
 
 export interface AppManifest {
   name: string;

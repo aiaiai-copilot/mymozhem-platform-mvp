@@ -89,7 +89,6 @@ export class BaseClient {
     const url = this.buildUrl(path, params);
 
     const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...headers,
     };
 
@@ -103,6 +102,7 @@ export class BaseClient {
     };
 
     if (body !== undefined) {
+      requestHeaders['Content-Type'] = 'application/json';
       fetchOptions.body = JSON.stringify(body);
     }
 

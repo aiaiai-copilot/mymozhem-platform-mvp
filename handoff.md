@@ -1,403 +1,415 @@
-# Handoff: All Platform Routes Complete - Monorepo Setup Next
+# Handoff: Lottery App Testing & Bug Fixes Complete
 
-**Date:** December 30, 2025
-**Session:** Platform API improvements + Participant/Prize/Winner routes
-**Previous Session:** Database setup + Core API implementation
-**Next Task:** 🎯 **Monorepo Setup (Turborepo + Platform SDK)** ← RECOMMENDED NEXT STEP
-
----
-
-## Current Session Summary (December 30, 2025)
-
-This session implemented all remaining platform routes and critical improvements.
-
-### ✅ What Was Accomplished
-
-**1. Auth Middleware Split (Performance Fix)**
-- Created `requireAuth` - Fast JWT signature-only validation (no DB lookup)
-- Created `requireAuthStrict` - JWT + blacklist check for sensitive operations
-- Applied strict auth to: logout, delete account
-- 10-20x faster authentication for most endpoints
-
-**2. Circular Import Fix**
-- Extracted Prisma client to `src/db.ts`
-- Updated all imports to use new location
-- Prevents fragile import chains
-
-**3. appSettings Validation (AJV)**
-- Added JSON Schema validation against app manifest
-- Validates on room create and update
-- Returns detailed error messages with hints
-
-**4. Password Check (Security)**
-- Added demo password validation ("password123")
-- TODO comment for production OAuth/bcrypt migration
-
-**5. Participant Routes (5 endpoints)**
-- `POST /api/v1/rooms/:roomId/participants` - Join room
-- `DELETE /api/v1/rooms/:roomId/participants/me` - Leave room
-- `GET /api/v1/rooms/:roomId/participants` - List participants
-- `PATCH /api/v1/rooms/:roomId/participants/:id` - Update (organizer only)
-- `DELETE /api/v1/rooms/:roomId/participants/:id` - Remove (organizer only)
-
-**6. Prize Routes (5 endpoints)**
-- `POST /api/v1/rooms/:roomId/prizes` - Create prize
-- `GET /api/v1/rooms/:roomId/prizes` - List prizes
-- `GET /api/v1/rooms/:roomId/prizes/:id` - Get prize details
-- `PATCH /api/v1/rooms/:roomId/prizes/:id` - Update prize
-- `DELETE /api/v1/rooms/:roomId/prizes/:id` - **Soft delete only!**
-
-**7. Winner Routes (4 endpoints)**
-- `POST /api/v1/rooms/:roomId/winners` - Select winner (atomic quantity decrement)
-- `GET /api/v1/rooms/:roomId/winners` - List winners
-- `GET /api/v1/rooms/:roomId/winners/:id` - Get winner details
-- `DELETE /api/v1/rooms/:roomId/winners/:id` - Revoke winner (restores prize quantity)
-
-**8. Rate Limiting**
-- Added `@fastify/rate-limit` (100 req/min per IP)
-
-**9. Session Deliverables**
-- **1 commit** pushed to GitHub
-- **16 files changed** (1,220 insertions, 36 deletions)
-- **5 new source files** created
-- **24 total REST endpoints** now available
+**Date:** January 1, 2026
+**Session:** Testing, debugging, and feature additions
+**Previous Session:** Monorepo setup + Lottery app implementation
+**Next Task:** Continue testing (prizes, winner draw), then commit changes
 
 ---
 
-## Why Monorepo Setup Next? 🎯
+## Session Summary
 
-### Expert Recommendation: Set Up Monorepo Now
+This session focused on testing the lottery app and fixing critical bugs that blocked functionality. Successfully tested login/logout, room creation, room deletion, and fixed multiple blocking issues.
 
-With all platform endpoints complete, now is the ideal time to set up the monorepo:
+### 1. Bug Fixes (Critical)
 
-**1. Type Safety Across Boundaries**
-- Platform API changes automatically propagate as TypeScript types
-- Apps/SDK break at compile-time (good) instead of runtime (bad)
+#### A. Logout Endpoint 400 Error
+**Problem:** SDK was sending `Content-Type: application/json` header on requests with no body, causing Fastify to reject logout requests with "Body cannot be empty when content-type is set to 'application/json'"
 
-**2. Better Development & Testing**
-- Test 24 endpoints with SDK client instead of curl
-- `await sdk.rooms.list()` with full type checking
+**Root Cause:** `packages/platform-sdk/src/client/base.ts` always set Content-Type header (line 92), even for requests without a body.
 
-**3. Enables Parallel Work**
-- Platform team can work on WebSocket
-- App team can start building lottery/quiz apps
-- No sequential bottleneck
+**Fix Applied:**
+```typescript
+// BEFORE (line 91-93):
+const requestHeaders: Record<string, string> = {
+  'Content-Type': 'application/json',  // ❌ Always set
+  ...headers,
+};
 
-**4. Industry Standard**
-- Modern TypeScript platforms use monorepo from day 1
+// AFTER (line 91-106):
+const requestHeaders: Record<string, string> = {
+  ...headers,
+};
+
+if (body !== undefined) {
+  requestHeaders['Content-Type'] = 'application/json';  // ✅ Only when body exists
+  fetchOptions.body = JSON.stringify(body);
+}
+```
+
+**Files Changed:**
+- `packages/platform-sdk/src/client/base.ts:91-106`
+
+#### B. Auth State Not Updating After Login
+**Problem:** After login, header still showed "Login" link instead of user name and "Logout" button. Required page refresh to see changes.
+
+**Root Cause:** Each component calling `useAuth()` created its own isolated state instance. When `LoginForm` logged in, it updated its local state, but `Layout` component's separate state didn't know about the change.
+
+**Fix Applied:** Implemented React Context pattern for shared state
+1. Created `AuthContext` provider: `apps/lottery/src/contexts/AuthContext.tsx`
+2. Updated `useAuth` hook to consume context instead of creating local state
+3. Wrapped app with `<AuthProvider>` in `App.tsx`
+
+**Files Changed:**
+- Created: `apps/lottery/src/contexts/AuthContext.tsx` (new file, 71 lines)
+- Modified: `apps/lottery/src/hooks/useAuth.ts` (reduced from 69 to 12 lines)
+- Modified: `apps/lottery/src/App.tsx:11` (wrapped with AuthProvider)
+
+#### C. Date-Time Format Validation Error
+**Problem:** When creating room, saw error: `unknown format "date-time" ignored in schema at path "#/properties/drawDate"`
+
+**Root Cause:** AJV (JSON schema validator) doesn't recognize format keywords like `date-time` without the `ajv-formats` plugin.
+
+**Fix Applied:**
+1. Installed `ajv-formats` package: `cd platform && pnpm add ajv-formats`
+2. Imported and registered formats in validation utility:
+
+```typescript
+// platform/src/utils/validateAppSettings.ts:7-11
+import Ajv, { ErrorObject } from 'ajv';
+import addFormats from 'ajv-formats';
+
+const ajv = new Ajv({ allErrors: true });
+addFormats(ajv);  // ✅ Register date-time, email, uri, etc.
+```
+
+**Files Changed:**
+- `platform/package.json` (added ajv-formats@3.0.1)
+- `platform/src/utils/validateAppSettings.ts:7-11`
+
+#### D. Create Room Schema Validation Error
+**Problem:** After fixing date-time format, still got "appSettings does not match app manifest schema"
+
+**Root Cause:** Frontend was sending wrong fields. The lottery app manifest requires:
+- `ticketCount` (integer, minimum 1) ✅ Required
+- `drawDate` (string, ISO date-time) ✅ Required
+
+But frontend was sending:
+- `ticketCount: 100` ✅ Correct
+- `theme: 'generic'` ❌ Not in schema
+- `allowMultipleWins: false` ❌ Not in schema
+- Missing `drawDate` ❌ Required field
+
+**Fix Applied:** Updated `CreateRoomPage.tsx` to match manifest schema
+1. Added `ticketCount` number input (defaults to 100)
+2. Added `drawDate` datetime-local input (defaults to 1 week from now)
+3. Removed invalid fields (`theme`, `allowMultipleWins`)
+4. Convert datetime-local to ISO format before sending
+
+**Files Changed:**
+- `apps/lottery/src/pages/CreateRoomPage.tsx:12-25, 40-52, 93-130`
+
+### 2. Feature Additions
+
+#### Delete Room Functionality
+**Added:** Delete button for room organizers with confirmation dialog
+
+**Implementation:**
+- Backend endpoint already existed: `DELETE /api/v1/rooms/:roomId` (soft delete)
+- SDK method already existed: `platform.rooms.delete(roomId)`
+- Added frontend UI in `RoomPage.tsx`:
+  - Red "Delete" button next to status badge (organizers only)
+  - Confirmation dialog before deletion
+  - Navigate to home page after successful deletion
+
+**Files Changed:**
+- `apps/lottery/src/pages/RoomPage.tsx:1, 13, 17, 44-61, 74-96`
 
 ---
 
-## Next Session: Monorepo Setup
+## Current State
 
-### Goal
-Transform project into proper monorepo structure with shared SDK package.
-
-### Tasks
-
-**1. Initialize Turborepo**
+### Servers Running
+Both development servers are running successfully:
 ```bash
-pnpm add -D -w turbo
-# Create turbo.json with build pipeline
+# Backend (Platform API)
+cd platform && pnpm dev
+# Running at: http://localhost:3000
+
+# Frontend (Lottery App)
+pnpm --filter @event-platform/lottery dev
+# Running at: http://localhost:5173
 ```
 
-**2. Create Platform SDK Package**
+### Build Status
+```bash
+pnpm build  # ✅ All 3 packages build successfully (tested in previous session)
 ```
-packages/platform-sdk/
-├── src/
-│   ├── types/          # API types from platform
-│   ├── client/         # Type-safe API client
-│   ├── schemas/        # Zod validation schemas
-│   └── index.ts        # Public exports
-├── package.json
-└── tsconfig.json
-```
+- `@event-platform/sdk` - 0 errors
+- `@event-platform/platform` - 0 errors
+- `@event-platform/lottery` - 225KB JS + 12KB CSS
 
-**3. SDK Features**
-- Type-safe fetch wrapper for all 24 endpoints
-- Auth, Users, Rooms, Participants, Prizes, Winners
-- Bearer token management
-- Error handling with typed errors
-
-**4. Expected Outcome**
+### Git Status
 ```
-/
-├── packages/
-│   └── platform-sdk/        # ← NEW
-├── platform/                # Backend (complete)
-├── apps/                    # ← READY for lottery/quiz
-│   ├── lottery/
-│   └── quiz/
-├── turbo.json               # ← NEW
-├── package.json             # ← UPDATED
-└── pnpm-workspace.yaml      # ← NEW
+Changes not committed (this session):
+- Modified: packages/platform-sdk/src/client/base.ts (logout fix)
+- Modified: platform/package.json (added ajv-formats)
+- Modified: platform/src/utils/validateAppSettings.ts (added formats)
+- Created: apps/lottery/src/contexts/AuthContext.tsx (React Context)
+- Modified: apps/lottery/src/hooks/useAuth.ts (use context)
+- Modified: apps/lottery/src/App.tsx (AuthProvider wrapper)
+- Modified: apps/lottery/src/pages/CreateRoomPage.tsx (schema fix)
+- Modified: apps/lottery/src/pages/RoomPage.tsx (delete button)
+- Modified: handoff.md (this file)
+
+Previous session changes (already staged/ready):
+- Modified: platform/package.json (rate-limit fix from prev session)
+- Modified: pnpm-lock.yaml
+- Deleted: apps/lottery/.gitkeep
+- New: apps/lottery/* (all app files)
+- New: packages/platform-sdk/* (SDK package)
 ```
 
 ---
 
-## Current Project State
+## Next Session Tasks
 
-### Repository
-- **Branch:** master
-- **Remote:** https://github.com/aiaiai-copilot/mymozhem-platform-mvp
-- **Status:** Clean (all changes committed)
-- **Total Commits:** 10
+### 1. Continue Testing
 
-### Recent Commits
-```
-d2ddf61 Add participant/prize/winner routes and improve auth middleware
-8d3823b Update handoff: Platform backend API complete, monorepo setup next
-f6fdbaf Implement core platform backend API with Fastify and JWT authentication
+**Already Working ✅:**
+- Login/Logout (with immediate UI updates)
+- Room list display
+- Room creation (with proper validation)
+- Room deletion (organizers only)
+
+**Not Yet Tested ❌:**
+- Prize management (add/edit/delete prizes)
+- Winner draw functionality
+- Multiple participants joining
+- Room status transitions (DRAFT → ACTIVE → COMPLETED)
+
+**How to Test Prizes:**
+
+Option A - Via API (curl):
+```bash
+# Get token from browser DevTools → Application → Local Storage → token
+TOKEN="eyJhbGc..."
+
+# Add a prize
+curl -X POST http://localhost:3000/api/v1/rooms/ROOM_ID/prizes \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Grand Prize - iPhone 15",
+    "description": "Latest iPhone 15 Pro 256GB",
+    "quantity": 1,
+    "imageUrl": "https://picsum.photos/400/300"
+  }'
 ```
 
-### Project Structure
+Option B - Implement Prize UI (recommended):
+- Add "Add Prize" button in RoomPage (organizers only)
+- Create PrizeForm component similar to CreateRoomPage
+- Use `platform.prizes.create(roomId, prizeData)`
+
+**How to Test Winner Draw:**
+1. Create a room with `alice@example.com`
+2. Add at least one prize
+3. Change room status to ACTIVE (via API or add UI button)
+4. Login as `bob@example.com` in incognito and join room
+5. As Alice, click "Draw Winners" button
+6. Verify winner is displayed
+
+### 2. Rebuild SDK and Restart Servers
+
+**IMPORTANT:** If you make changes to the SDK, you must:
+```bash
+# Step 1: Rebuild SDK
+cd packages/platform-sdk
+pnpm build
+
+# Step 2: Restart frontend to pick up changes
+# Kill the frontend dev server (Ctrl+C or /tasks, then kill)
+pnpm --filter @event-platform/lottery dev
 ```
-/
-├── README.md
-├── CLAUDE.md
-├── handoff.md                # This file
-├── .github/workflows/        # CI/CD validation
-├── .claude/
-│   ├── agents/               # 3 subagents
-│   ├── commands/             # 13 slash commands
-│   └── hooks/
-├── .mcp.json                 # MCP server configuration
-├── docs/
-│   ├── api/                  # API specifications
-│   ├── openapi.yaml
-│   └── event-platform-context.md
-└── platform/                 # ← BACKEND COMPLETE ✅
-    ├── src/
-    │   ├── config/
-    │   ├── db.ts             # ← NEW: Prisma client
-    │   ├── middleware/
-    │   │   ├── auth.ts       # ← UPDATED: requireAuth + requireAuthStrict
-    │   │   └── errorHandler.ts
-    │   ├── routes/
-    │   │   ├── auth.ts
-    │   │   ├── users.ts
-    │   │   ├── rooms.ts
-    │   │   ├── participants.ts  # ← NEW
-    │   │   ├── prizes.ts        # ← NEW
-    │   │   └── winners.ts       # ← NEW
-    │   ├── utils/
-    │   │   ├── jwt.ts
-    │   │   └── validateAppSettings.ts  # ← NEW: AJV validation
-    │   ├── types/
-    │   └── index.ts
-    └── prisma/
+
+### 3. Commit Changes (After Testing)
+
+```bash
+git add -A
+git commit -m "Fix critical bugs and add lottery app features
+
+Bug Fixes:
+- Fix SDK logout endpoint (Content-Type header issue)
+- Fix auth state not updating after login (React Context)
+- Fix date-time format validation (add ajv-formats)
+- Fix create room schema validation (match app manifest)
+
+Features:
+- Add delete room button for organizers
+- Add proper form validation for room creation
+
+🤖 Generated with Claude Code
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+git push
 ```
 
 ---
 
 ## What's Complete ✅
 
-### REST API Endpoints (24 total)
-
-**Auth (4 endpoints)**
-- ✅ `POST /api/v1/auth/login` - Login with JWT
-- ✅ `POST /api/v1/auth/refresh` - Refresh token
-- ✅ `POST /api/v1/auth/logout` - Logout + blacklist (strict auth)
-- ✅ `GET /api/v1/auth/me` - Current user
-
-**Users (3 endpoints)**
-- ✅ `GET /api/v1/users/:userId` - Get user
-- ✅ `PATCH /api/v1/users/:userId` - Update user
-- ✅ `DELETE /api/v1/users/:userId` - Delete user (strict auth)
-
-**Rooms (5 endpoints)**
-- ✅ `GET /api/v1/rooms` - List rooms (paginated)
-- ✅ `GET /api/v1/rooms/:roomId` - Get room details
-- ✅ `POST /api/v1/rooms` - Create room (validates appSettings)
-- ✅ `PATCH /api/v1/rooms/:roomId` - Update room
-- ✅ `DELETE /api/v1/rooms/:roomId` - Delete room
-
-**Participants (5 endpoints)**
-- ✅ `POST /api/v1/rooms/:roomId/participants` - Join room
-- ✅ `DELETE /api/v1/rooms/:roomId/participants/me` - Leave room
-- ✅ `GET /api/v1/rooms/:roomId/participants` - List participants
-- ✅ `PATCH /api/v1/rooms/:roomId/participants/:id` - Update participant
-- ✅ `DELETE /api/v1/rooms/:roomId/participants/:id` - Remove participant
-
-**Prizes (5 endpoints)**
-- ✅ `POST /api/v1/rooms/:roomId/prizes` - Create prize
-- ✅ `GET /api/v1/rooms/:roomId/prizes` - List prizes
-- ✅ `GET /api/v1/rooms/:roomId/prizes/:id` - Get prize
-- ✅ `PATCH /api/v1/rooms/:roomId/prizes/:id` - Update prize
-- ✅ `DELETE /api/v1/rooms/:roomId/prizes/:id` - Soft delete prize
-
-**Winners (4 endpoints)**
-- ✅ `POST /api/v1/rooms/:roomId/winners` - Select winner (atomic)
-- ✅ `GET /api/v1/rooms/:roomId/winners` - List winners
-- ✅ `GET /api/v1/rooms/:roomId/winners/:id` - Get winner
-- ✅ `DELETE /api/v1/rooms/:roomId/winners/:id` - Revoke winner
-
-### Security & Performance
-- ✅ Split auth middleware (fast vs strict)
-- ✅ Rate limiting (100 req/min)
-- ✅ appSettings JSON Schema validation
-- ✅ Password validation (demo mode)
-- ✅ Atomic winner selection (prevents race conditions)
-- ✅ Soft delete enforcement (prizes, winners)
-
 ### Infrastructure
-- ✅ PostgreSQL database (Docker)
-- ✅ Prisma ORM (8 models, 45 indexes)
-- ✅ Fastify server with ES modules
-- ✅ JWT authentication
-- ✅ Token blacklist
-- ✅ Error handling
-- ✅ CORS + Rate limiting
-- ✅ dotenv configuration
+- ✅ Turborepo monorepo with pnpm workspaces
+- ✅ Shared `@event-platform/sdk` package (working, tested)
+- ✅ Type-safe API client for all 24 endpoints
+- ✅ Platform backend (24 REST endpoints)
+- ✅ PostgreSQL + Prisma ORM
+- ✅ AJV schema validation with format support (date-time, email, etc.)
+
+### Lottery App - Tested & Working
+- ✅ React + Vite + Tailwind setup
+- ✅ **Auth flow (login/logout)** - Fixed React Context state management
+- ✅ **Room list (public lotteries)** - Tested, working
+- ✅ **Room detail view** - Tested, working
+- ✅ **Create room form** - Fixed schema validation, working
+- ✅ **Delete room button** - New feature, tested, working
+- ✅ Participant list component (displayed, not tested with multiple users)
+- ✅ Prize display component (UI ready, not tested with real data)
+- ✅ Draw button (client-side random, not tested)
+- ✅ Winner reveal component (UI ready, not tested)
+- ✅ Real-time hooks (prepared for WebSocket, not active)
+
+### Bug Fixes This Session
+- ✅ SDK logout endpoint 400 error (Content-Type header fix)
+- ✅ Auth state not updating after login (React Context)
+- ✅ Date-time format validation error (ajv-formats)
+- ✅ Create room schema mismatch (ticketCount + drawDate)
 
 ---
 
 ## What's NOT Done ❌
 
-### Infrastructure (Still Needed)
-- ❌ **Monorepo setup** ← NEXT SESSION
-- ❌ WebSocket server (Socket.io)
-- ❌ OAuth integration (Google)
-- ❌ Permission middleware (app capability validation)
-- ❌ Webhook system (timeout, circuit breaker)
+### High Priority (Needed for MVP)
+- ❌ **Prize creation UI** - Need to add prizes before testing winner draw
+- ❌ **Room status management UI** - Button to change DRAFT → ACTIVE → COMPLETED
+- ❌ **Winner draw testing** - Main feature, not tested yet
+- ❌ **Multi-user testing** - Test with multiple participants joining
 
-### Applications (Not Started)
-- ❌ Platform SDK package
-- ❌ Lottery application (frontend + backend)
-- ❌ Quiz application (frontend + backend)
-- ❌ Application manifest implementations
+### Lottery App (Nice to Have)
+- ❌ Prize editing/deletion UI (API exists, no UI)
+- ❌ Multiple prize selection in draw (currently draws one at a time)
+- ❌ Winner animations/celebrations
+- ❌ Participant metadata (ticket numbers, etc.)
+- ❌ Room settings display (show drawDate, ticketCount)
 
----
+### Platform (Future)
+- ❌ WebSocket server (Socket.io) - real-time won't work yet
+- ❌ OAuth integration (Google) - currently password-only
+- ❌ App manifest registration endpoint
+- ❌ Permission middleware enforcement
 
-## Quick Start Guide
-
-### Start Platform Server
-```bash
-cd platform
-pnpm dev
-# Server runs on http://localhost:3000
-```
-
-### Test Endpoints
-```bash
-# Health check
-curl http://localhost:3000/health
-
-# Login
-curl -X POST http://localhost:3000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@example.com","password":"password123"}'
-
-# List public rooms
-curl http://localhost:3000/api/v1/rooms
-
-# Join a room (requires token)
-curl -X POST http://localhost:3000/api/v1/rooms/ROOM_ID/participants \
-  -H "Authorization: Bearer YOUR_TOKEN"
-
-# Create a prize (requires organizer)
-curl -X POST http://localhost:3000/api/v1/rooms/ROOM_ID/prizes \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Grand Prize","quantity":1}'
-
-# Select a winner (atomic operation)
-curl -X POST http://localhost:3000/api/v1/rooms/ROOM_ID/winners \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"participantId":"...","prizeId":"..."}'
-```
-
----
-
-## Test Data Available
-
-**Users (4):**
-- alice@example.com (Organizer of New Year Lottery)
-- bob@example.com (Organizer of Christmas Quiz)
-- charlie@example.com
-- diana@example.com
-
-**Password:** `password123` (for all users)
-
-**Apps (2):**
-- app_lottery_v1 (Holiday Lottery v1.0.0)
-- app_quiz_v1 (Quiz "Who's First?" v1.0.0)
-
-**Rooms (3 active):**
-- New Year Lottery 2025 (lottery, 4 participants, 3 prizes)
-- Christmas Trivia Quiz (quiz, 3 participants, 1 prize)
-- Private Office Lottery (draft, 1 participant, 0 prizes)
+### Other Apps
+- ❌ Quiz app (real-time mechanics)
 
 ---
 
 ## Key Files Reference
 
-### Platform Source Code
-- `platform/src/index.ts` - Main server entry point
-- `platform/src/db.ts` - Prisma client instance
-- `platform/src/config/index.ts` - Environment configuration
-- `platform/src/middleware/auth.ts` - requireAuth + requireAuthStrict
-- `platform/src/middleware/errorHandler.ts` - Error handling
-- `platform/src/routes/auth.ts` - Auth endpoints (4)
-- `platform/src/routes/users.ts` - User endpoints (3)
-- `platform/src/routes/rooms.ts` - Room endpoints (5)
-- `platform/src/routes/participants.ts` - Participant endpoints (5)
-- `platform/src/routes/prizes.ts` - Prize endpoints (5)
-- `platform/src/routes/winners.ts` - Winner endpoints (4)
-- `platform/src/utils/jwt.ts` - JWT utilities
-- `platform/src/utils/validateAppSettings.ts` - AJV validation
-- `platform/src/types/index.ts` - TypeScript types
+### Modified This Session (Critical)
+- `packages/platform-sdk/src/client/base.ts:91-106` - **Logout fix** (Content-Type header)
+- `platform/src/utils/validateAppSettings.ts:7-11` - **AJV formats** (date-time support)
+- `apps/lottery/src/contexts/AuthContext.tsx` - **NEW** React Context for auth state
+- `apps/lottery/src/hooks/useAuth.ts` - **Simplified** to use context
+- `apps/lottery/src/App.tsx:11` - **Wrapped** with AuthProvider
+- `apps/lottery/src/pages/CreateRoomPage.tsx:12-25,40-52,93-130` - **Schema fix** (ticketCount + drawDate)
+- `apps/lottery/src/pages/RoomPage.tsx:1,13,17,44-61,74-96` - **Delete button** added
 
-### Database & Schema
-- `platform/prisma/schema.prisma` - Database schema (280 lines)
-- `platform/prisma/seed.ts` - Test data seeder
-- `platform/prisma/migrations/` - Migration history
+### Monorepo Config
+- `pnpm-workspace.yaml` - Workspace packages
+- `turbo.json` - Build pipeline (uses `pipeline` not `tasks` for v1.x)
+- `tsconfig.json` - Base TypeScript config
+
+### Platform SDK
+- `packages/platform-sdk/src/index.ts` - Main export
+- `packages/platform-sdk/src/client/index.ts` - PlatformClient class
+- `packages/platform-sdk/src/client/base.ts` - Base HTTP client (modified this session)
+- `packages/platform-sdk/src/types/index.ts` - Type exports
+
+### Lottery App
+- `apps/lottery/src/App.tsx` - Router setup + AuthProvider (modified this session)
+- `apps/lottery/src/lib/platform.ts` - SDK instance
+- `apps/lottery/src/contexts/AuthContext.tsx` - Auth context provider (new this session)
+- `apps/lottery/src/hooks/useAuth.ts` - Auth state hook (modified this session)
+- `apps/lottery/src/hooks/useRoom.ts` - Room + real-time
+- `apps/lottery/src/pages/CreateRoomPage.tsx` - Create room form (modified this session)
+- `apps/lottery/src/pages/RoomPage.tsx` - Room detail + delete button (modified this session)
+- `apps/lottery/src/components/DrawButton.tsx` - Winner selection logic
+
+### Platform Backend
+- `platform/package.json` - Dependencies (ajv-formats added this session)
+- `platform/src/utils/validateAppSettings.ts` - Schema validation (modified this session)
+- `platform/src/routes/rooms.ts` - Room routes (unchanged, working)
+- `platform/src/index.ts` - Server entry
 
 ---
 
-## Important Notes
+## Test Users
 
-### Auth Middleware Split
-- **requireAuth** - Fast path, JWT signature only (use for 99% of endpoints)
-- **requireAuthStrict** - JWT + blacklist check (logout, delete account, sensitive ops)
-- Trade-off: Revoked tokens remain valid until expiry (max 1 hour)
+| Email | Password | Notes |
+|-------|----------|-------|
+| alice@example.com | password123 | Organizer of "New Year Lottery 2025" |
+| bob@example.com | password123 | Organizer of "Christmas Trivia Quiz" |
+| charlie@example.com | password123 | Regular user |
+| diana@example.com | password123 | Regular user |
 
-### Soft Delete Protection
-Three models use `onDelete: Restrict` and require soft delete:
-- **Prize** - Cannot hard delete if Winners exist
-- **User** - Cannot hard delete if created Rooms exist
-- **App** - Cannot hard delete if Rooms reference it
+---
 
-### Atomic Winner Selection
-Winner selection uses atomic `updateMany` to prevent race conditions:
-```typescript
-const updated = await prisma.prize.updateMany({
-  where: { id: prizeId, quantityRemaining: { gt: 0 } },
-  data: { quantityRemaining: { decrement: 1 } },
-});
-if (updated.count === 0) throw new Error('PRIZE_EXHAUSTED');
+## Commands Reference
+
+```bash
+# Development
+pnpm dev                              # Start all (platform + lottery + sdk watch)
+pnpm --filter @event-platform/lottery dev  # Lottery only
+pnpm --filter @event-platform/platform dev # Platform only
+
+# Build
+pnpm build                            # Build all packages
+pnpm type-check                       # Type check all
+
+# Database
+cd platform
+pnpm db:seed                          # Seed test data
+pnpm db:reset                         # Reset and reseed
+pnpm prisma:generate                  # Regenerate Prisma client
 ```
 
 ---
 
-## Ready to Proceed 🚀
+## Summary for Next Session
 
-✅ **All platform REST endpoints complete** - 24 endpoints working
-✅ **Authentication optimized** - Split middleware for performance
-✅ **Validation enhanced** - appSettings JSON Schema validation
-✅ **Security improved** - Password check, rate limiting
-✅ **Database production-ready** - 8 models, 45 indexes
+### What We Accomplished This Session
+1. ✅ Fixed 4 critical bugs blocking basic functionality
+2. ✅ Added delete room feature
+3. ✅ Tested login/logout, room creation, room deletion
+4. ✅ All core authentication and room CRUD operations working
 
-**Next Session Goal:** 🎯 **Set up monorepo with Turborepo + Platform SDK package**
+### Immediate Next Steps
+1. **Add Prize Creation UI** - Without prizes, can't test winner draw
+2. **Add Room Status UI** - Button to transition DRAFT → ACTIVE
+3. **Test Winner Draw** - The main feature
+4. **Commit All Changes** - Use the commit message in "Next Session Tasks" section
 
-This enables:
-- Type-safe API client for all 24 endpoints
-- Shared types across packages
-- Parallel development (platform + apps)
-- Better testing with SDK instead of curl
+### Development Environment
+- Backend: `http://localhost:3000` (running in background: task b436547)
+- Frontend: `http://localhost:5173` (running in background: task b06c0e1)
+- Both servers ready to continue testing
+
+### Quick Start Next Session
+```bash
+# Check if servers still running
+/tasks
+
+# If not, restart:
+cd platform && pnpm dev  # Terminal 1
+pnpm --filter @event-platform/lottery dev  # Terminal 2
+
+# Open app
+open http://localhost:5173
+```
 
 ---
 
-**Last Updated:** December 30, 2025
-**Session Status:** Complete - All platform routes implemented, monorepo setup recommended for next session
+**Last Updated:** January 1, 2026
+**Status:** Testing in progress, core features working, prize management & winner draw pending
