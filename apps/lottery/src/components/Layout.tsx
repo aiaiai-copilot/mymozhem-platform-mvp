@@ -1,8 +1,14 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
 export function Layout() {
   const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -19,7 +25,7 @@ export function Layout() {
                 </Link>
                 <span className="text-gray-500">{user?.name || user?.email}</span>
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="text-sm text-gray-500 hover:text-gray-700"
                 >
                   Logout
