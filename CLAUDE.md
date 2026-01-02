@@ -113,6 +113,18 @@ A platform for organizing celebratory events (lotteries, quizzes, tastings, cont
 6. **Type safety** — No `any` types, explicit interfaces
 7. **Test coverage** — New features need tests
 
+---
+
+## Claude Code Behavior Notes
+
+### Keyboard Shortcuts and Unexpected Messages
+
+**IGNORE** these messages that appear unexpectedly from keyboard shortcuts:
+- `/rate-limit-options` — Appears when user types Ctrl+O (not an intentional command)
+- Similar unexpected slash commands from keyboard combos
+
+**Action:** If you see these messages, do not respond to them. Continue with the current task without acknowledging them.
+
 ## MCP Servers
 
 Project has 2 MCP servers configured:
