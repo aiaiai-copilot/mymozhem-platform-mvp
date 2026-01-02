@@ -98,15 +98,14 @@ pnpm exec playwright install chromium
 Before running tests, start the platform backend and frontend:
 
 ```bash
-# Terminal 1: Start backend
+# Terminal 1: Start backend in TEST mode (disables rate limiting)
 cd platform
-pnpm dev
+pnpm dev:test
 
 # Terminal 2: Start frontend
 pnpm --filter @event-platform/lottery dev
 
-# Or use the combined dev command:
-pnpm dev
+# Note: Use 'pnpm dev:test' instead of 'pnpm dev' to disable rate limiting during tests
 ```
 
 ### 3. Ensure Database is Seeded

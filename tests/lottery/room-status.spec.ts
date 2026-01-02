@@ -22,7 +22,7 @@ test.describe('TS-L-004: Room Status Management', () => {
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
     // Verify room status is DRAFT
-    await expect(page.locator('text=DRAFT')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("DRAFT")')).toBeVisible();
 
     // Verify "Start Lottery" button is visible
     await expect(page.locator('button:has-text("Start Lottery")')).toBeVisible();
@@ -35,7 +35,7 @@ test.describe('TS-L-004: Room Status Management', () => {
     await page.waitForTimeout(1000);
 
     // Verify status changed to ACTIVE
-    await expect(page.locator('text=ACTIVE')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("ACTIVE")')).toBeVisible();
 
     // Verify "Start Lottery" button disappeared
     await expect(page.locator('button:has-text("Start Lottery")')).not.toBeVisible();
@@ -57,7 +57,7 @@ test.describe('TS-L-004: Room Status Management', () => {
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
     // Verify room status is ACTIVE
-    await expect(page.locator('text=ACTIVE')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("ACTIVE")')).toBeVisible();
 
     // Click "Complete Lottery" button and accept confirmation
     page.once('dialog', dialog => dialog.accept());
@@ -67,7 +67,7 @@ test.describe('TS-L-004: Room Status Management', () => {
     await page.waitForTimeout(1000);
 
     // Verify status changed to COMPLETED
-    await expect(page.locator('text=COMPLETED')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("COMPLETED")')).toBeVisible();
 
     // Verify "Complete Lottery" button disappeared
     await expect(page.locator('button:has-text("Complete Lottery")')).not.toBeVisible();
@@ -86,7 +86,7 @@ test.describe('TS-L-004: Room Status Management', () => {
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
     // Verify status badge is visible
-    await expect(page.locator('text=ACTIVE')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("ACTIVE")')).toBeVisible();
 
     // Verify status change buttons are NOT visible
     await expect(page.locator('button:has-text("Start Lottery")')).not.toBeVisible();
@@ -112,7 +112,7 @@ test.describe('TS-L-004: Room Status Management', () => {
     await page.waitForTimeout(500);
 
     // Verify status is still DRAFT
-    await expect(page.locator('text=DRAFT')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("DRAFT")')).toBeVisible();
 
     // Verify "Start Lottery" button still visible
     await expect(page.locator('button:has-text("Start Lottery")')).toBeVisible();

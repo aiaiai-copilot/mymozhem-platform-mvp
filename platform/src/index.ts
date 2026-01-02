@@ -36,13 +36,18 @@ await fastify.register(cors, {
   credentials: true,
 });
 
-// Register rate limiting
-await fastify.register(rateLimit, {
-  max: 100,
-  timeWindow: '1 minute',
-  // Stricter limits for auth endpoints
-  keyGenerator: (request) => request.ip,
-});
+// Register rate limiting (disabled in test mode)
+if (config.nodeEnv !== 'test') {
+  await fastify.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    // Stricter limits for auth endpoints
+    keyGenerator: (request) => request.ip,
+  });
+  fastify.log.info('✓ Rate limiting enabled');
+} else {
+  fastify.log.info('⚠ Rate limiting disabled (test mode)');
+}
 
 // Register error handler
 import { errorHandler } from './middleware/errorHandler.js';

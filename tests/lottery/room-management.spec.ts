@@ -20,7 +20,7 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
     await expect(page.locator('text=New Year Lottery 2025')).toBeVisible();
 
     // Verify status badge is visible
-    await expect(page.locator('text=ACTIVE').first()).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("ACTIVE")').first()).toBeVisible();
 
     // Verify "New Lottery" button is visible
     await expect(page.locator('button:has-text("New Lottery")')).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
     await expect(page).toHaveURL(/\/room\//);
 
     // Verify room status is DRAFT
-    await expect(page.locator('text=DRAFT')).toBeVisible();
+    await expect(page.locator('span.rounded-full:has-text("DRAFT")')).toBeVisible();
 
     // Verify room name is displayed
     await expect(page.locator(`text=Test Lottery ${timestamp}`)).toBeVisible();

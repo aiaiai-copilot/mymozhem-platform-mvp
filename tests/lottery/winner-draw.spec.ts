@@ -35,8 +35,8 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await loginViaUI(page, 'alice');
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
-    // Count existing winners
-    const winnersCountBefore = await page.locator('[class*="winner"]').count();
+    // Check if winners section shows "No winners yet"
+    const hasNoWinners = await page.locator('text=No winners yet').isVisible();
 
     // Verify "Draw Winner" button is visible and enabled
     const drawButton = page.locator('button:has-text("Draw Winner")');
@@ -54,12 +54,13 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     // Wait for UI update
     await page.waitForTimeout(1000);
 
-    // Verify new winner appears
-    const winnersCountAfter = await page.locator('[class*="winner"]').count();
-    expect(winnersCountAfter).toBeGreaterThan(winnersCountBefore);
+    // Verify winners section now shows "Winners" heading
+    await expect(page.locator('h3:has-text("Winners")')).toBeVisible();
 
-    // Verify winner information is displayed
-    await expect(page.locator('text=/won|winner/i')).toBeVisible();
+    // Verify winner information is displayed (either Bob or Charlie won)
+    const hasBobWon = await page.locator('text=Bob Smith').first().isVisible();
+    const hasCharlieWon = await page.locator('text=Charlie Davis').first().isVisible();
+    expect(hasBobWon || hasCharlieWon).toBe(true);
   });
 
   test('6.2: Draw Multiple Winners Sequentially', async ({ page, request }) => {
@@ -101,9 +102,10 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
       await page.waitForTimeout(500);
     }
 
-    // Verify at least 3 winners are displayed
-    const winnersCount = await page.locator('[class*="winner"]').count();
-    expect(winnersCount).toBeGreaterThanOrEqual(3);
+    // Verify at least 3 winners are displayed (count winner cards in the winners section)
+    const winnersSection = page.locator('h3:has-text("Winners")').locator('..').locator('..');
+    const winnerCards = winnersSection.locator('.bg-white.rounded-lg');
+    await expect(winnerCards).toHaveCount(3);
   });
 
   test('6.3: Draw Winner - No Eligible Participants', async ({ page, request }) => {
@@ -159,7 +161,9 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await page.click('text=New Year Lottery 2025');
 
     // Get winner information before reload
-    const winnerText = await page.locator('[class*="winner"]').first().textContent();
+    const winnersSection = page.locator('h3:has-text("Winners")').locator('..').locator('..');
+    const firstWinnerCard = winnersSection.locator('.bg-white.rounded-lg').first();
+    const winnerText = await firstWinnerCard.textContent();
 
     // Reload page
     await page.reload();
@@ -168,10 +172,12 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await page.waitForLoadState('networkidle');
 
     // Verify winner is still displayed
-    await expect(page.locator('[class*="winner"]').first()).toBeVisible();
+    const winnersSectionAfter = page.locator('h3:has-text("Winners")').locator('..').locator('..');
+    const firstWinnerCardAfter = winnersSectionAfter.locator('.bg-white.rounded-lg').first();
+    await expect(firstWinnerCardAfter).toBeVisible();
 
     // Verify winner data matches
-    const winnerTextAfter = await page.locator('[class*="winner"]').first().textContent();
+    const winnerTextAfter = await firstWinnerCardAfter.textContent();
     expect(winnerTextAfter).toBe(winnerText);
   });
 

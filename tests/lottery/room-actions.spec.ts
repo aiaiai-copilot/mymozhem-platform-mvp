@@ -35,7 +35,8 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // Verify user appears in participants list
     await page.waitForTimeout(1000);
-    await expect(page.locator(`text=${TEST_USERS.charlie.name}`)).toBeVisible();
+    // Scope to participants section (sidebar) to avoid matching header
+    await expect(page.locator('.lg\\:col-span-1').locator(`text=${TEST_USERS.charlie.name}`)).toBeVisible();
 
     // Verify "Join Lottery" button disappeared
     await expect(page.locator('button:has-text("Join")')).not.toBeVisible();
@@ -77,14 +78,14 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
     await loginViaUI(page, 'alice');
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
-    // Verify organizer role
-    await expect(page.locator('text=ORGANIZER')).toBeVisible();
+    // Verify organizer role (scope to participants sidebar to avoid heading)
+    await expect(page.locator('.lg\\:col-span-1').locator('text=ORGANIZER').first()).toBeVisible();
 
     // Verify participant role
-    await expect(page.locator('text=PARTICIPANT')).toBeVisible();
+    await expect(page.locator('.lg\\:col-span-1').locator('text=PARTICIPANT').first()).toBeVisible();
 
     // Verify viewer role
-    await expect(page.locator('text=VIEWER')).toBeVisible();
+    await expect(page.locator('.lg\\:col-span-1').locator('text=VIEWER').first()).toBeVisible();
   });
 
   // ========== TS-L-007: Delete Room ==========

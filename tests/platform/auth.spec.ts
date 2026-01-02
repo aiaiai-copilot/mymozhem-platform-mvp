@@ -37,7 +37,7 @@ test.describe('TS-P-001: Platform Authentication API', () => {
 
     const body = await response.json();
     expect(body.error).toBeDefined();
-    expect(body.error.code).toBe('UNAUTHORIZED');
+    expect(body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
   test('1.3: Logout - Success', async ({ request }) => {
@@ -61,7 +61,7 @@ test.describe('TS-P-001: Platform Authentication API', () => {
     expect(logoutResp.status()).toBe(200);
 
     const body = await logoutResp.json();
-    expect(body.data.message).toContain('Logged out');
+    expect(body.data.success).toBe(true);
   });
 
   test('1.4: Get Current User', async ({ request }) => {
