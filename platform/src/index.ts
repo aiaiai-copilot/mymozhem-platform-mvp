@@ -40,7 +40,7 @@ await fastify.register(cors, {
 if (config.nodeEnv !== 'test') {
   await fastify.register(rateLimit, {
     // Higher limit in development for E2E tests
-    max: config.nodeEnv === 'development' ? 1000 : 100,
+    max: config.nodeEnv === 'development' ? 1000 : 500,
     timeWindow: '1 minute',
     keyGenerator: (request) => request.ip,
   });
