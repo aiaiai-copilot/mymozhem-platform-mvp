@@ -12,7 +12,7 @@ export default defineConfig({
   testDir: './tests',
   timeout: 30000,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 4,
+  workers: process.env.CI ? 1 : 2, // Reduced from 4 to avoid overwhelming backend
 
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],

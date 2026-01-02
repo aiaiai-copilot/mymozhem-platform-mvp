@@ -22,8 +22,8 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
     // Verify status badge is visible
     await expect(page.locator('span.rounded-full:has-text("ACTIVE")').first()).toBeVisible();
 
-    // Verify "New Lottery" button is visible
-    await expect(page.locator('button:has-text("New Lottery")')).toBeVisible();
+    // Verify "Create Room" link is visible
+    await expect(page.locator('a:has-text("Create Room")')).toBeVisible();
   });
 
   test('2.2: Click on Room Card', async ({ page }) => {
@@ -43,18 +43,18 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
   test('3.1: Create Room with Valid Data', async ({ page }) => {
     await page.goto('http://localhost:5173/');
 
-    // Click "New Lottery" button
-    await page.click('button:has-text("New Lottery")');
+    // Click "Create Room" link
+    await page.click('a:has-text("Create Room")');
 
     // Verify navigated to create room page
     await expect(page).toHaveURL('http://localhost:5173/create');
 
     // Fill form
     const timestamp = Date.now();
-    await page.fill('input[name="name"]', `Test Lottery ${timestamp}`);
-    await page.fill('textarea[name="description"]', 'Testing lottery creation');
-    await page.fill('input[name="ticketCount"]', '50');
-    await page.fill('input[name="drawDate"]', '2026-06-01T18:00');
+    await page.fill('#name', `Test Lottery ${timestamp}`);
+    await page.fill('#description', 'Testing lottery creation');
+    await page.fill('#ticketCount', '50');
+    await page.fill('#drawDate', '2026-06-01T18:00');
 
     // Submit form
     await page.click('button:has-text("Create Lottery")');
@@ -73,8 +73,8 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
     await page.goto('http://localhost:5173/create');
 
     // Fill only name field
-    await page.fill('input[name="name"]', 'Test Lottery');
-    await page.fill('input[name="ticketCount"]', '100');
+    await page.fill('#name', 'Test Lottery');
+    await page.fill('#ticketCount', '100');
     // Intentionally skip drawDate
 
     // Try to submit
@@ -88,7 +88,7 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
     await page.goto('http://localhost:5173/create');
 
     // Verify ticketCount has default value
-    const ticketCount = await page.locator('input[name="ticketCount"]').inputValue();
+    const ticketCount = await page.locator('#ticketCount').inputValue();
     expect(parseInt(ticketCount)).toBeGreaterThan(0);
   });
 });

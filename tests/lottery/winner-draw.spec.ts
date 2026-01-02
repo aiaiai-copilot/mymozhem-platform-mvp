@@ -103,8 +103,9 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     }
 
     // Verify at least 3 winners are displayed (count winner cards in the winners section)
-    const winnersSection = page.locator('h3:has-text("Winners")').locator('..').locator('..');
-    const winnerCards = winnersSection.locator('.bg-white.rounded-lg');
+    // Find the winners gradient container (from-yellow-50) and count cards within it
+    const winnersContainer = page.locator('.from-yellow-50');
+    const winnerCards = winnersContainer.locator('.bg-white.rounded-lg');
     await expect(winnerCards).toHaveCount(3);
   });
 
@@ -126,8 +127,9 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await loginViaUI(page, 'alice');
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
-    // Verify "Draw Winner" button is disabled
-    const drawButton = page.locator('button:has-text("Draw Winner")');
+    // Verify button shows "No eligible participants" and is disabled
+    const drawButton = page.locator('button:has-text("No eligible participants")');
+    await expect(drawButton).toBeVisible();
     await expect(drawButton).toBeDisabled();
   });
 
@@ -147,8 +149,9 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await loginViaUI(page, 'alice');
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
-    // Verify "Draw Winner" button is disabled
-    const drawButton = page.locator('button:has-text("Draw Winner")');
+    // Verify button shows "No prizes available" and is disabled
+    const drawButton = page.locator('button:has-text("No prizes available")');
+    await expect(drawButton).toBeVisible();
     await expect(drawButton).toBeDisabled();
   });
 
@@ -209,10 +212,12 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     // Draw winner
     await page.click('button:has-text("Draw Winner")');
     await page.waitForResponse(resp => resp.url().includes('/winners'));
-    await page.waitForTimeout(1000);
+    // Wait for refetch and UI update
+    await page.waitForTimeout(2000);
 
-    // Get new prize quantity
-    const newQuantity = await prizeCard.locator('text=/remaining/i').textContent();
+    // Get new prize quantity (reload prize card in case it changed)
+    const updatedPrizeCard = page.locator('text=Limited Prize').locator('..');
+    const newQuantity = await updatedPrizeCard.locator('text=/remaining/i').textContent();
 
     // Verify quantity changed
     expect(newQuantity).not.toBe(initialQuantity);

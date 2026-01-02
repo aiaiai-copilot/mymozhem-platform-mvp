@@ -39,9 +39,9 @@ await fastify.register(cors, {
 // Register rate limiting (disabled in test mode)
 if (config.nodeEnv !== 'test') {
   await fastify.register(rateLimit, {
-    max: 100,
+    // Higher limit in development for E2E tests
+    max: config.nodeEnv === 'development' ? 1000 : 100,
     timeWindow: '1 minute',
-    // Stricter limits for auth endpoints
     keyGenerator: (request) => request.ip,
   });
   fastify.log.info('✓ Rate limiting enabled');
