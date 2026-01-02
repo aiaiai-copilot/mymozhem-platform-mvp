@@ -205,22 +205,30 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await loginViaUI(page, 'alice');
     await page.goto(`http://localhost:5173/room/${room.id}`);
 
-    // Get initial prize quantity
+    // Get initial prize quantity remaining (the number, not the "/ X remaining" text)
     const prizeCard = page.locator('text=Limited Prize').locator('..');
-    const initialQuantity = await prizeCard.locator('text=/remaining/i').textContent();
+    const initialQuantityText = await prizeCard.locator('.text-green-600, .text-gray-400').first().textContent();
+    const initialQuantity = parseInt(initialQuantityText?.trim() || '0');
 
     // Draw winner
     await page.click('button:has-text("Draw Winner")');
-    await page.waitForResponse(resp => resp.url().includes('/winners'));
-    // Wait for refetch and UI update
-    await page.waitForTimeout(2000);
 
-    // Get new prize quantity (reload prize card in case it changed)
+    // Wait for both the winner POST and the subsequent prizes GET (refetch)
+    await Promise.all([
+      page.waitForResponse(resp => resp.url().includes('/winners') && resp.status() === 201),
+      page.waitForResponse(resp => resp.url().includes('/prizes') && resp.request().method() === 'GET'),
+    ]);
+
+    // Wait for UI to update
+    await page.waitForTimeout(500);
+
+    // Get new prize quantity remaining
     const updatedPrizeCard = page.locator('text=Limited Prize').locator('..');
-    const newQuantity = await updatedPrizeCard.locator('text=/remaining/i').textContent();
+    const newQuantityText = await updatedPrizeCard.locator('.text-green-600, .text-gray-400').first().textContent();
+    const newQuantity = parseInt(newQuantityText?.trim() || '0');
 
-    // Verify quantity changed
-    expect(newQuantity).not.toBe(initialQuantity);
+    // Verify quantity decreased by 1
+    expect(newQuantity).toBe(initialQuantity - 1);
   });
 
   test('6.7: Only Organizer Can Draw Winners', async ({ page, request }) => {
