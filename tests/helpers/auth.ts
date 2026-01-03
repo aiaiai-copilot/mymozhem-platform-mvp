@@ -1,4 +1,6 @@
 import { APIRequestContext, Page } from '@playwright/test';
+import { TEST_CONFIG } from './config';
+
 
 /**
  * Test user credentials
@@ -44,13 +46,13 @@ export async function loginViaUI(
 ): Promise<void> {
   const userData = TEST_USERS[user];
 
-  await page.goto('http://localhost:5173/login');
+  await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
   await page.fill('input[type="email"]', userData.email);
   await page.fill('input[type="password"]', userData.password);
   await page.click('button:has-text("Login")');
 
   // Wait for redirect to home page
-  await page.waitForURL('http://localhost:5173/');
+  await page.waitForURL(`${TEST_CONFIG.lotteryUrl}/`);
 }
 
 /**
@@ -58,7 +60,7 @@ export async function loginViaUI(
  */
 export async function logoutViaUI(page: Page): Promise<void> {
   await page.click('text=Logout');
-  await page.waitForURL('http://localhost:5173/login');
+  await page.waitForURL(`${TEST_CONFIG.lotteryUrl}/login`);
 }
 
 /**

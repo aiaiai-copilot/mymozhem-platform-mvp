@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { loginAsUser, loginViaUI, TEST_USERS } from '../helpers/auth';
 import { createTestRoom, createPrize, joinRoom, updateRoomStatus } from '../helpers/fixtures';
+import { TEST_CONFIG } from '../helpers/config';
+
 
 /**
  * TS-L-006: Winner Draw Functionality
@@ -33,7 +35,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
 
     // Navigate to room as organizer
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Check if winners section shows "No winners yet"
     const hasNoWinners = await page.locator('text=No winners yet').isVisible();
@@ -91,7 +93,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Draw 3 winners
     for (let i = 0; i < 3; i++) {
@@ -125,7 +127,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify button shows "No eligible participants" and is disabled
     const drawButton = page.locator('button:has-text("No eligible participants")');
@@ -147,7 +149,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify button shows "No prizes available" and is disabled
     const drawButton = page.locator('button:has-text("No prizes available")');
@@ -160,7 +162,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
     await loginViaUI(page, 'alice');
 
     // Navigate to seeded room "New Year Lottery 2025"
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
     await page.click('text=New Year Lottery 2025');
 
     // Get winner information before reload
@@ -203,7 +205,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Get initial prize quantity remaining (the number, not the "/ X remaining" text)
     const prizeCard = page.locator('text=Limited Prize').locator('..');
@@ -246,7 +248,7 @@ test.describe('TS-L-006: Winner Draw Functionality', () => {
 
     // Login as Bob (participant, not organizer)
     await loginViaUI(page, 'bob');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify "Draw Winner" button is NOT visible
     await expect(page.locator('button:has-text("Draw Winner")')).not.toBeVisible();

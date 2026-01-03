@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { loginAsUser, loginViaUI, TEST_USERS } from '../helpers/auth';
 import { createTestRoom, updateRoomStatus } from '../helpers/fixtures';
+import { TEST_CONFIG } from '../helpers/config';
+
 
 /**
  * TS-L-004: Room Status Management
@@ -19,7 +21,7 @@ test.describe('TS-L-004: Room Status Management', () => {
 
     // Login via UI and navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify room status is DRAFT
     await expect(page.locator('span.rounded-full:has-text("DRAFT")')).toBeVisible();
@@ -54,7 +56,7 @@ test.describe('TS-L-004: Room Status Management', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify room status is ACTIVE
     await expect(page.locator('span.rounded-full:has-text("ACTIVE")')).toBeVisible();
@@ -83,7 +85,7 @@ test.describe('TS-L-004: Room Status Management', () => {
 
     // Login as Bob (non-organizer)
     await loginViaUI(page, 'bob');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify status badge is visible
     await expect(page.locator('span.rounded-full:has-text("ACTIVE")')).toBeVisible();
@@ -102,7 +104,7 @@ test.describe('TS-L-004: Room Status Management', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Click "Start Lottery" but dismiss confirmation
     page.once('dialog', dialog => dialog.dismiss());

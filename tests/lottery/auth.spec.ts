@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { loginViaUI, logoutViaUI, TEST_USERS } from '../helpers/auth';
+import { TEST_CONFIG } from '../helpers/config';
+
 
 /**
  * TS-L-001: User Authentication Flow
@@ -8,7 +10,7 @@ import { loginViaUI, logoutViaUI, TEST_USERS } from '../helpers/auth';
 test.describe('TS-L-001: User Authentication Flow', () => {
 
   test('1.1: Successful Login', async ({ page }) => {
-    await page.goto('http://localhost:5173/login');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
 
     // Fill login form
     await page.fill('input[type="email"]', TEST_USERS.alice.email);
@@ -16,7 +18,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await page.click('button:has-text("Login")');
 
     // Verify redirect to home page
-    await expect(page).toHaveURL('http://localhost:5173/');
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Verify user name appears in header
     await expect(page.locator('header').locator(`text=${TEST_USERS.alice.name}`)).toBeVisible();
@@ -33,7 +35,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
   });
 
   test('1.2: Failed Login - Invalid Credentials', async ({ page }) => {
-    await page.goto('http://localhost:5173/login');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
 
     // Fill form with wrong password
     await page.fill('input[type="email"]', TEST_USERS.alice.email);
@@ -41,7 +43,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await page.click('button:has-text("Login")');
 
     // Verify stays on login page
-    await expect(page).toHaveURL('http://localhost:5173/login');
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/login`);
 
     // Verify error message is displayed
     await expect(page.locator('.bg-red-50, .text-red-600, [class*="error"]')).toBeVisible();
@@ -62,7 +64,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await logoutViaUI(page);
 
     // Verify redirected to login page
-    await expect(page).toHaveURL('http://localhost:5173/login');
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/login`);
 
     // Verify token removed from localStorage
     const token = await page.evaluate(() => localStorage.getItem('accessToken'));
@@ -76,7 +78,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
   });
 
   test('1.4: Auth State Persistence After Login', async ({ page }) => {
-    await page.goto('http://localhost:5173/login');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
 
     // Fill and submit login form
     await page.fill('input[type="email"]', TEST_USERS.alice.email);
@@ -84,7 +86,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await page.click('button:has-text("Login")');
 
     // Wait for redirect
-    await page.waitForURL('http://localhost:5173/');
+    await page.waitForURL(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Verify user name appears immediately without page refresh
     // This tests the React Context auth state update
@@ -100,7 +102,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     // This test should be enabled after implementing route guards
 
     // Try to access protected route without being logged in
-    await page.goto('http://localhost:5173/create');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/create`);
 
     // Should redirect to login page
     await expect(page).toHaveURL(/\/login/);

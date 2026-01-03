@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { loginAsUser, loginViaUI, TEST_USERS } from '../helpers/auth';
 import { createTestRoom, updateRoomStatus, joinRoom } from '../helpers/fixtures';
+import { TEST_CONFIG } from '../helpers/config';
+
 
 /**
  * TS-L-005: Participant Management
@@ -20,7 +22,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // Login as Charlie (who is not in the room)
     await loginViaUI(page, 'charlie');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify "Join Lottery" button is visible
     await expect(page.locator('button:has-text("Join")')).toBeVisible();
@@ -53,7 +55,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // Try to access as Charlie
     await loginViaUI(page, 'charlie');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify "Join Lottery" button is NOT visible
     await expect(page.locator('button:has-text("Join")')).not.toBeVisible();
@@ -73,7 +75,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // View room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify organizer role (scope to participants section)
     const participantsSection = page.locator('h3:has-text("Participants")').locator('..');
@@ -94,7 +96,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify "Delete" button is visible
     await expect(page.locator('button:has-text("Delete")')).toBeVisible();
@@ -110,7 +112,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
     );
 
     // Verify redirected to home page
-    await expect(page).toHaveURL('http://localhost:5173/');
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Verify room no longer in list (wait for list to load)
     await page.waitForTimeout(1000);
@@ -126,7 +128,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // Navigate to room
     await loginViaUI(page, 'alice');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Click "Delete" but dismiss confirmation
     page.once('dialog', dialog => dialog.dismiss());
@@ -136,7 +138,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
     await page.waitForTimeout(500);
 
     // Verify still on room page
-    await expect(page).toHaveURL(`http://localhost:5173/room/${room.id}`);
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify room name still visible
     await expect(page.locator(`text=${room.name}`)).toBeVisible();
@@ -152,7 +154,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
 
     // Login as Bob (non-organizer)
     await loginViaUI(page, 'bob');
-    await page.goto(`http://localhost:5173/room/${room.id}`);
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${room.id}`);
 
     // Verify "Delete" button is NOT visible
     await expect(page.locator('button:has-text("Delete")')).not.toBeVisible();
@@ -163,7 +165,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
   test('8.1: Winners Section Displays Correctly', async ({ page }) => {
     // Use seeded room with existing winners
     await loginViaUI(page, 'alice');
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Click on seeded room
     await page.click('text=New Year Lottery 2025');
@@ -180,7 +182,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
   test('8.3: Winner Badge on Participant', async ({ page, request }) => {
     // Use seeded room which has winners
     await loginViaUI(page, 'alice');
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
     await page.click('text=New Year Lottery 2025');
 
     // Verify at least one participant has winner badge
@@ -192,7 +194,7 @@ test.describe('TS-L-005 & TS-L-007: Room Actions', () => {
   test('9.1: Prize Cards Display Correctly', async ({ page, request }) => {
     // Use seeded room with prizes
     await loginViaUI(page, 'alice');
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
     await page.click('text=New Year Lottery 2025');
 
     // Verify prize section heading is visible

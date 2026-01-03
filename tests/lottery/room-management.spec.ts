@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { loginViaUI, TEST_USERS } from '../helpers/auth';
+import { TEST_CONFIG } from '../helpers/config';
+
 
 /**
  * TS-L-002: Room List Display
@@ -14,7 +16,7 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
 
   test('2.1: View Public Rooms', async ({ page }) => {
     // Navigate to home page
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Verify room list is displayed
     await expect(page.locator('text=New Year Lottery 2025')).toBeVisible();
@@ -27,7 +29,7 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
   });
 
   test('2.2: Click on Room Card', async ({ page }) => {
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Click on a room card
     const roomCard = page.locator('text=New Year Lottery 2025').first();
@@ -41,13 +43,13 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
   });
 
   test('3.1: Create Room with Valid Data', async ({ page }) => {
-    await page.goto('http://localhost:5173/');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/`);
 
     // Click "Create Room" link
     await page.click('a:has-text("Create Room")');
 
     // Verify navigated to create room page
-    await expect(page).toHaveURL('http://localhost:5173/create');
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/create`);
 
     // Fill form
     const timestamp = Date.now();
@@ -70,7 +72,7 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
   });
 
   test('3.2: Create Room - Validation Error (Missing Required Field)', async ({ page }) => {
-    await page.goto('http://localhost:5173/create');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/create`);
 
     // Fill only name field
     await page.fill('#name', 'Test Lottery');
@@ -81,11 +83,11 @@ test.describe('TS-L-002 & TS-L-003: Room Management', () => {
     await page.click('button:has-text("Create Lottery")');
 
     // Verify stays on create page (form validation prevents submission)
-    await expect(page).toHaveURL('http://localhost:5173/create');
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/create`);
   });
 
   test('3.3: Create Room Form Fields Are Pre-filled with Defaults', async ({ page }) => {
-    await page.goto('http://localhost:5173/create');
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/create`);
 
     // Verify ticketCount has default value
     const ticketCount = await page.locator('#ticketCount').inputValue();
