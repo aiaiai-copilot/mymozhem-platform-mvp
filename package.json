@@ -25,6 +25,7 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "socket.io-client": "^4.6.0",
     "turbo": "^1.11.3"
   },
   "packageManager": "pnpm@8.15.0",

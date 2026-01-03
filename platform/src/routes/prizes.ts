@@ -13,6 +13,7 @@ import { ParticipantRole, Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ApiResponse, AuthenticatedRequest } from '../types/index.js';
+import { broadcastPrizeCreated, broadcastPrizeUpdated, broadcastPrizeDeleted } from '../websocket/events.js';
 
 // Request validation schemas
 const CreatePrizeSchema = z.object({
@@ -89,6 +90,9 @@ export async function prizeRoutes(fastify: FastifyInstance) {
         metadata: body.metadata as Prisma.InputJsonValue | undefined,
       },
     });
+
+    // Broadcast prize created
+    broadcastPrizeCreated(roomId, prize);
 
     const response: ApiResponse = {
       data: prize,
@@ -219,6 +223,9 @@ export async function prizeRoutes(fastify: FastifyInstance) {
       data: updateData,
     });
 
+    // Broadcast prize updated
+    broadcastPrizeUpdated(roomId, prizeId, body, prize);
+
     const response: ApiResponse = {
       data: prize,
     };
@@ -264,6 +271,9 @@ export async function prizeRoutes(fastify: FastifyInstance) {
       where: { id: prizeId },
       data: { deletedAt: new Date() },
     });
+
+    // Broadcast prize deleted
+    broadcastPrizeDeleted(roomId, prizeId);
 
     const response: ApiResponse = {
       data: { success: true },

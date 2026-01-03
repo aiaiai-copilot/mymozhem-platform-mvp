@@ -9,6 +9,7 @@ import { ParticipantRole, Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ApiResponse, AuthenticatedRequest } from '../types/index.js';
+import { broadcastParticipantJoined, broadcastParticipantLeft } from '../websocket/events.js';
 
 // Request validation schemas
 const UpdateParticipantSchema = z.object({
@@ -67,6 +68,9 @@ export async function participantRoutes(fastify: FastifyInstance) {
           },
         });
 
+        // Broadcast participant rejoined
+        broadcastParticipantJoined(roomId, participant);
+
         const response: ApiResponse = {
           data: participant,
         };
@@ -100,6 +104,9 @@ export async function participantRoutes(fastify: FastifyInstance) {
         },
       },
     });
+
+    // Broadcast participant joined
+    broadcastParticipantJoined(roomId, participant);
 
     const response: ApiResponse = {
       data: participant,
@@ -150,6 +157,9 @@ export async function participantRoutes(fastify: FastifyInstance) {
       where: { id: participation.id },
       data: { deletedAt: new Date() },
     });
+
+    // Broadcast participant left
+    broadcastParticipantLeft(roomId, participation.id, authReq.user.userId);
 
     const response: ApiResponse = {
       data: { success: true },
@@ -348,6 +358,9 @@ export async function participantRoutes(fastify: FastifyInstance) {
       where: { id: participantId },
       data: { deletedAt: new Date() },
     });
+
+    // Broadcast participant left
+    broadcastParticipantLeft(roomId, participantId, targetParticipant.userId);
 
     const response: ApiResponse = {
       data: { success: true },

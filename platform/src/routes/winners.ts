@@ -12,6 +12,7 @@ import { ParticipantRole, Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import type { ApiResponse, AuthenticatedRequest } from '../types/index.js';
+import { broadcastWinnerSelected } from '../websocket/events.js';
 
 // Request validation schemas
 const SelectWinnerSchema = z.object({
@@ -160,6 +161,9 @@ export async function winnerRoutes(fastify: FastifyInstance) {
         prize: true,
       },
     });
+
+    // Broadcast winner selected
+    broadcastWinnerSelected(roomId, winner);
 
     const response: ApiResponse = {
       data: winner,

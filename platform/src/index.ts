@@ -78,6 +78,9 @@ await fastify.register(participantRoutes);
 await fastify.register(prizeRoutes);
 await fastify.register(winnerRoutes);
 
+// Initialize WebSocket server
+import { initializeWebSocket } from './websocket/index.js';
+
 // Start server
 async function start() {
   try {
@@ -90,6 +93,9 @@ async function start() {
       port: config.port,
       host: config.host,
     });
+
+    // Initialize WebSocket after server is listening
+    await initializeWebSocket(fastify);
 
     fastify.log.info(`✓ Server listening on http://${config.host}:${config.port}`);
     fastify.log.info(`✓ Environment: ${config.nodeEnv}`);

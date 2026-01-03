@@ -10,6 +10,7 @@ import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateAppSettings, formatValidationErrors, AppManifest } from '../utils/validateAppSettings.js';
 import type { ApiResponse, AuthenticatedRequest, PaginationParams } from '../types/index.js';
+import { broadcastRoomUpdated, broadcastRoomStatusChanged, broadcastRoomDeleted } from '../websocket/events.js';
 
 // Request validation schemas
 const CreateRoomSchema = z.object({
@@ -31,7 +32,9 @@ const UpdateRoomSchema = z.object({
 export async function roomRoutes(fastify: FastifyInstance) {
   // GET /api/v1/rooms (list public rooms)
   fastify.get('/api/v1/rooms', async (request, reply) => {
-    const { page = 1, limit = 20 } = request.query as PaginationParams;
+    const query = request.query as PaginationParams;
+    const page = parseInt(String(query.page || '1'), 10);
+    const limit = parseInt(String(query.limit || '20'), 10);
     const skip = (page - 1) * limit;
 
     const [rooms, total] = await Promise.all([
@@ -287,6 +290,12 @@ export async function roomRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Get current room to check for status changes
+    const currentRoom = await prisma.room.findUnique({
+      where: { id: roomId },
+      select: { status: true },
+    });
+
     // Prepare update data with proper type casting for JSON fields
     const updateData: Prisma.RoomUpdateInput = {
       ...(body.name !== undefined && { name: body.name }),
@@ -300,6 +309,14 @@ export async function roomRoutes(fastify: FastifyInstance) {
       where: { id: roomId },
       data: updateData,
     });
+
+    // Broadcast room updated
+    broadcastRoomUpdated(roomId, body, room);
+
+    // Broadcast status change if status was updated
+    if (body.status && currentRoom && body.status !== currentRoom.status) {
+      broadcastRoomStatusChanged(roomId, currentRoom.status, body.status);
+    }
 
     const response: ApiResponse = {
       data: room,
@@ -339,6 +356,9 @@ export async function roomRoutes(fastify: FastifyInstance) {
       where: { id: roomId },
       data: { deletedAt: new Date() },
     });
+
+    // Broadcast room deleted
+    broadcastRoomDeleted(roomId);
 
     const response: ApiResponse = {
       data: { success: true },
