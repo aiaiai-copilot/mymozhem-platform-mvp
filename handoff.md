@@ -1,296 +1,144 @@
 # Session 4 Handoff — Post-Login Redirect & WebSocket Room Status
 
 **Date:** January 4, 2026
-**Status:** ✅ **All Systems Go** - Type check passing, pending commit
-**Session Focus:** Implementing missing features from Session 3 recommendations
+**Status:** ✅ **All Systems Go** - 44/44 tests passing, all commits pushed
+**Session Focus:** Implementing missing features + fixing WebSocket subscription
 
 ---
 
 ## 🎯 Session 4 Summary
 
-This session implemented two features that were flagged as "not implemented" in the Session 3 recommendations:
-
-1. ✅ **Post-Login Redirect** — Users now return to their intended page after login
-2. ✅ **WebSocket Room Status Listeners** — Frontend now listens to `room:updated` and `room:status_changed` events
-3. ✅ **Fixed TypeScript Error** — Exported `AuthContextType` interface
-
-### Files Modified
-
-| File | Change |
-|------|--------|
-| `apps/lottery/src/components/LoginForm.tsx` | Added `useLocation` to redirect to saved location after login |
-| `apps/lottery/src/hooks/useRoom.ts` | Added handlers for `room:updated` and `room:status_changed` events |
-| `apps/lottery/src/contexts/AuthContext.tsx` | Exported `AuthContextType` interface (fixed TS error) |
-
----
-
-# Session 3 Handoff — WebSocket E2E Tests & Route Guards
-
-**Date:** January 3, 2026
-**Status:** ✅ **Complete**
-**Session Focus:** WebSocket E2E Testing + Route Guards Implementation
-
----
-
-## 🎯 Session 3 Summary
-
-This session completed WebSocket E2E test coverage and implemented route guards for protected routes. The test suite is now at **100% pass rate** with **zero skipped tests**.
+Implemented two features flagged as "not implemented" in Session 3 recommendations, plus discovered and fixed a WebSocket subscription bug.
 
 ### Tasks Completed
 
-1. ✅ **WebSocket E2E Test Suite Created** (6 new tests)
-2. ✅ **Centralized Test Configuration** (eliminated hardcoded URLs)
-3. ✅ **Route Guards Implemented** (protected /create and /room/:id)
-4. ✅ **Enabled Skipped Test** (test 1.5 now passing)
-5. ✅ **Fixed Multiple Test Issues** (selectors, timing, URL patterns)
+1. ✅ **Post-Login Redirect** — Users now return to their intended page after login
+2. ✅ **WebSocket Room Status Listeners** — Frontend listens to `room:updated` and `room:status_changed`
+3. ✅ **Socket Subscription Fix** — Wait for connection before emitting subscription
+4. ✅ **TypeScript Fix** — Exported `AuthContextType` interface
+5. ✅ **Test 1.6 Added** — Redirect back to protected route after login
+6. ✅ **Test 8.5 Fixed** — Multi-user WebSocket with proper participant requirement
 
 ---
 
 ## 📊 Current Test Status
 
-### **43/43 Tests Passing (100%)**
-### **0 Skipped** ⬆️ (was 1 in Session 2)
+### **44/44 Tests Passing (100%)**
 
-**Platform API Tests:** 6/6 ✅
-- TS-P-001: Authentication API (6 tests)
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Platform API (TS-P-001) | 6 | ✅ |
+| User Auth (TS-L-001) | 7 | ✅ (+1 new) |
+| Room Management (TS-L-002/003) | 6 | ✅ |
+| Room Status (TS-L-004) | 4 | ✅ |
+| Room Actions (TS-L-005/007) | 10 | ✅ |
+| Winner Draw (TS-L-006) | 7 | ✅ |
+| WebSocket Events (TS-L-008) | 6 | ✅ |
 
-**Lottery App Tests:** 37/37 ✅
-- TS-L-001: User Authentication Flow **(6 tests)** — includes previously skipped test 1.5 ✨
-- TS-L-002 & TS-L-003: Room Management (6 tests)
-- TS-L-004: Room Status Management (4 tests)
-- TS-L-005 & TS-L-007: Room Actions (10 tests)
-- TS-L-006: Winner Draw Functionality (7 tests)
-- **TS-L-008: WebSocket Real-Time Events (6 tests) — NEW** ✨
-
-**Previous Session:** 36 passing, 1 skipped
-**This Session:** 43 passing, 0 skipped
-**Net Change:** +7 tests, 100% pass rate
+**Previous Session:** 43 passing
+**This Session:** 44 passing (+1 new test)
 
 ---
 
 ## 🆕 What's New This Session
 
-### 1. WebSocket E2E Test Suite ✅
+### 1. Post-Login Redirect ✅
 
-**File:** `tests/lottery/websocket-events.spec.ts` (256 lines)
+**File:** `apps/lottery/src/components/LoginForm.tsx`
 
-Created comprehensive test coverage for WebSocket real-time events:
+Users are now redirected to the page they tried to access before being sent to login.
 
-| Test | Description | Status |
-|------|-------------|--------|
-| 8.1 | Participant Joined Event - Real-time Update | ✅ |
-| 8.2 | Winner Selected Event - Real-time Broadcast | ✅ |
-| 8.3 | Prize Created Event - Real-time Update | ✅ |
-| 8.4 | Multi-User Real-Time Sync | ✅ |
-| 8.5 | Room Status Change - Real-time Update | ✅ |
-| 8.6 | WebSocket Connection Resilience | ✅ |
-
-**Key Features:**
-- Multi-browser context testing (simulates Alice, Bob, Charlie)
-- Real-time event validation across simultaneous connections
-- Dynamic room creation for test isolation
-- Proper WebSocket event propagation timing (2s waits)
-
-### 2. Centralized Test Configuration ✅
-
-**File:** `tests/helpers/config.ts` (11 lines)
-
-**Problem Solved:** All tests had hardcoded `http://localhost:5173`, causing failures when Vite started on port 5176.
-
-**Solution:**
-```typescript
-export const PLATFORM_URL = process.env.PLATFORM_URL || 'http://localhost:3000';
-export const LOTTERY_URL = process.env.LOTTERY_URL || 'http://localhost:5173';
-export const TEST_CONFIG = { platformUrl: PLATFORM_URL, lotteryUrl: LOTTERY_URL } as const;
+```tsx
+// Read saved location from ProtectedRoute
+const state = location.state as LocationState;
+const redirectTo = state?.from?.pathname || '/';
+navigate(redirectTo, { replace: true });
 ```
 
-**Files Updated with TEST_CONFIG:** 7 test files
-- tests/lottery/auth.spec.ts
-- tests/lottery/room-actions.spec.ts
-- tests/lottery/room-management.spec.ts
-- tests/lottery/room-status.spec.ts
-- tests/lottery/winner-draw.spec.ts
-- tests/lottery/websocket-events.spec.ts
-- tests/helpers/auth.ts
+**Flow:** `/create` (protected) → `/login` → login → back to `/create`
 
-**Usage:**
-```bash
-LOTTERY_URL=http://localhost:5176 pnpm test:e2e
+### 2. WebSocket Room Status Listeners ✅
+
+**File:** `apps/lottery/src/hooks/useRoom.ts`
+
+Added handlers for room-level WebSocket events:
+
+```tsx
+socket.on('room:updated', handleRoomUpdated);
+socket.on('room:status_changed', handleRoomStatusChanged);
 ```
 
-### 3. Route Guards Implementation ✅
+Now room status changes broadcast to all participants in real-time.
 
-**File:** `apps/lottery/src/components/ProtectedRoute.tsx` (30 lines)
+### 3. Socket Subscription Fix ✅
 
-Implemented authentication-based route protection:
+**File:** `apps/lottery/src/lib/socket.ts`
 
-**Protected Routes:**
-- `/create` - CreateRoomPage (requires authentication)
-- `/room/:roomId` - RoomPage (requires authentication)
+**Problem:** `subscribeToRoom()` was called before socket connected, events were lost.
 
-**Features:**
-- Checks `isAuthenticated` from useAuth hook
-- Shows loading indicator during auth verification
-- Redirects to `/login` if not authenticated
-- Preserves intended route in location.state for post-login redirect
+**Fix:**
+```tsx
+export function subscribeToRoom(roomId: string) {
+  if (socket.connected) {
+    socket.emit('room:subscribe', { roomId });
+  } else {
+    socket.once('connect', () => {
+      socket.emit('room:subscribe', { roomId });
+    });
+  }
+}
+```
 
-**Modified:** `apps/lottery/src/App.tsx` - Wrapped protected routes with ProtectedRoute component
-
-### 4. Enabled Test 1.5 ✅
+### 4. Test 1.6: Post-Login Redirect Back ✅
 
 **File:** `tests/lottery/auth.spec.ts`
 
-**Previously:** Test was `.skip()`'ed with TODO comment
-**Now:** Fully enabled and passing ✅
+New test validates the complete redirect flow:
+1. Navigate to `/create` while logged out
+2. Get redirected to `/login`
+3. Login successfully
+4. Get redirected back to `/create`
 
-**Test:** "1.5: Redirect to Login When Accessing Protected Route"
-- Validates unauthorized users redirected to /login
-- Confirms route guards working correctly
+### 5. Test 8.5 Fix: Multi-User WebSocket ✅
 
----
+**File:** `tests/lottery/websocket-events.spec.ts`
 
-## 🐛 Issues Fixed This Session
+**Issue:** Bob wasn't receiving WebSocket events because he wasn't a participant.
 
-### 1. Hardcoded URL Port Conflicts
-**Problem:** Tests failing when Vite started on port 5176 instead of 5173
-**Root Cause:** Hardcoded `http://localhost:5173` in all test files
-**Fix:** Created centralized config with environment variable support
-**Files Affected:** 7 test files updated
+**Root Cause:** Backend requires users to be participants to subscribe to room WebSocket (security by design).
 
-### 2. WebSocket Test Selector Failures
-**Problems:**
-- Wrong URL patterns (`/rooms/:id` vs `/room/:id`)
-- Missing "2025" in room name selectors
-- Strict mode violations (multiple text matches)
-- Insufficient WebSocket event wait times
-
-**Fixes:**
-- Corrected URL regex to `/room\/.+/`
-- Updated selectors: `text=New Year Lottery 2025`
-- Added `.first()` for duplicate matches
-- Increased wait times to 2000ms
-
-### 3. Login Helper Parameter Error
-**Problem:** Passing `TEST_USERS.alice` object instead of string `'alice'`
-**Fix:** Changed all calls to `loginViaUI(page, 'alice')`
-
-### 4. Draft Room Visibility Issue
-**Problem:** Test 8.5 couldn't find draft room on public list
-**Root Cause:** Draft rooms not shown in public rooms list
-**Fix:** Modified test to create room via API and navigate directly
+**Fix:** Test now adds Bob as participant via API before expecting WebSocket events:
+```tsx
+await joinRoom(request, bobToken, draftRoom.id);
+```
 
 ---
 
 ## 💾 Git Status
 
-### Commits Ready
+### Commits
 
-**Commit 1:** `833567f` ✅ **PUSHED**
-```
-test: add WebSocket E2E tests and centralized test config
-- 6 new WebSocket E2E tests
-- Centralized test configuration
-- Updated 7 test files
-```
+| Hash | Message | Status |
+|------|---------|--------|
+| `4ac36a7` | feat: implement post-login redirect and WebSocket room status | ✅ PUSHED |
 
-**Commit 2:** `4b3056f` ✅ **PUSHED**
-```
-feat: implement route guards for protected routes
-- Created ProtectedRoute component
-- Protected /create and /room/:id routes
-- Enabled test 1.5 (previously skipped)
-- 43/43 tests passing
-```
-
-**Commit 3:** `a2efe2b` ✅ **PUSHED**
-```
-docs: update handoff for session 3 completion
-```
+**Branch:** master (up to date with origin)
 
 ---
 
-## 🏗️ Architecture Updates
+## 📝 Files Modified This Session
 
-### Route Protection Flow
-1. User navigates to protected route (e.g., `/create`)
-2. `ProtectedRoute` component checks `isAuthenticated`
-3. If not authenticated → redirect to `/login`
-4. If authenticated → render protected content
-5. Location state preserves intended route for post-login redirect
+| File | Change |
+|------|--------|
+| `apps/lottery/src/components/LoginForm.tsx` | Post-login redirect using location.state |
+| `apps/lottery/src/hooks/useRoom.ts` | WebSocket listeners for room:updated, room:status_changed |
+| `apps/lottery/src/lib/socket.ts` | Wait for connection before subscribing |
+| `apps/lottery/src/contexts/AuthContext.tsx` | Export AuthContextType (TS fix) |
+| `tests/lottery/auth.spec.ts` | Added test 1.6 |
+| `tests/lottery/websocket-events.spec.ts` | Fixed test 8.5 with participant requirement |
+| `handoff.md` | Updated documentation |
 
-### WebSocket Integration Status
-- **Backend:** ✅ Implemented (Session 2)
-- **Frontend:** ✅ Implemented (Session 2)
-- **E2E Tests:** ✅ Implemented (Session 3) ← **NEW**
-
-All WebSocket real-time events now have comprehensive E2E test coverage:
-- participant:joined ✅
-- participant:left (tested via rejoin detection)
-- winner:selected ✅
-- prize:created ✅
-- room:updated (tested via status change)
-- Multi-user sync ✅
-- Connection resilience ✅
-
----
-
-## 🧪 Running Tests
-
-### Full Test Suite
-```bash
-pnpm test:e2e
-# Expected: 43 passed (100%)
-```
-
-### Specific Suites
-```bash
-# WebSocket tests only
-LOTTERY_URL=http://localhost:5176 pnpm test:e2e --grep "WebSocket"
-# Expected: 6 passed
-
-# Auth tests
-pnpm test:e2e --grep "auth"
-# Expected: 12 passed (6 platform + 6 lottery)
-
-# Platform API only
-pnpm test:e2e tests/platform/
-# Expected: 6 passed
-```
-
-### With Custom Port
-```bash
-# If frontend runs on different port
-LOTTERY_URL=http://localhost:5176 pnpm test:e2e
-```
-
----
-
-## 📈 Project Statistics
-
-### Code Metrics
-- **Total Lines:** ~6,342 lines (productive code)
-- **Backend:** 2,590 lines (including 312 WebSocket lines)
-- **Frontend (Lottery):** ~3,000 lines
-- **Tests:** 757 lines (+52 this session)
-
-### Test Coverage
-- **E2E Tests:** 43 tests across 7 suites
-- **Platform API:** 6 tests
-- **Lottery App:** 37 tests
-  - Auth: 6 tests
-  - Room Management: 6 tests
-  - Room Actions: 10 tests
-  - Room Status: 4 tests
-  - Winner Draw: 7 tests
-  - **WebSocket: 6 tests** ← NEW
-- **Pass Rate:** 100% (43/43)
-- **Skipped:** 0 (down from 1)
-
-### Project Timeline
-- **Started:** December 27, 2025 (01:48:25)
-- **Session 3:** January 3, 2026
-- **Duration:** 8 days
-- **Total Commits:** 38 (including 1 unpushed)
+**Total:** 7 files, +116/-45 lines
 
 ---
 
@@ -299,118 +147,103 @@ LOTTERY_URL=http://localhost:5176 pnpm test:e2e
 ### High Priority
 
 #### 1. Build Quiz "Who's First?" App 🎯 **Recommended**
-- Real-time infrastructure ready and tested
+- Real-time infrastructure is ready and fully tested
 - Second app demonstrates platform versatility
-- Uses WebSocket for live competitive mechanics
+- Synchronous real-time mechanics (vs Lottery's async)
 - Tests pluggable application architecture
+
+**Key Features:**
+- Real-time question display to all participants
+- First-to-answer wins points
+- Live leaderboard updates via WebSocket
+- Buzzer-style interaction
 
 ### Medium Priority
 
-#### 2. ~~Post-Login Redirect Enhancement~~ ✅ **DONE (Session 4)**
-
-#### 3. ~~WebSocket Room Status Broadcasting~~ ✅ **DONE (Session 4)**
-
-### Low Priority
-
-#### 4. OAuth Integration (Google)
+#### 2. OAuth Integration (Google)
 - Listed in MVP goals
 - Currently password-only authentication
 - Framework includes `@fastify/oauth2`
 
-#### 5. Additional Features
-- Refresh token rotation
+#### 3. Token Refresh & Expiry Handling
+- No automatic logout on JWT expiry
+- No refresh token rotation implemented
+
+### Low Priority
+
+#### 4. Additional Enhancements
 - Password reset flow
 - Email verification
-- Better error messages for rate limits
-
----
-
-## 🎓 Key Learnings
-
-### Playwright Best Practices
-1. **Avoid hardcoded URLs** - Use environment variables
-2. **Use `.first()`** to handle strict mode violations
-3. **Specific selectors** - `h3:has-text("...")` better than `text=/regex/`
-4. **Multi-browser testing** - Use `context.newPage()` for each user
-5. **WebSocket timing** - Need 1-2 second waits for event propagation
-6. **Seed data accuracy** - Selectors must match exact seed data names
-
-### Route Protection
-1. **Component wrapper** better than inline checks
-2. **Loading states** improve UX during auth verification
-3. **Use `replace`** in redirects to avoid back button issues
-4. **Preserve location state** for post-login redirect
-
-### Test Environment
-1. **Dynamic ports** require flexible configuration
-2. **URL patterns** must match actual routes (singular vs plural)
-3. **Seed data names** must be used exactly in test selectors
-
----
-
-## 📝 Files Modified This Session
-
-### Created (3 files)
-- `tests/lottery/websocket-events.spec.ts` - WebSocket E2E tests (256 lines)
-- `tests/helpers/config.ts` - Centralized test config (11 lines)
-- `apps/lottery/src/components/ProtectedRoute.tsx` - Route guard (30 lines)
-
-### Modified (8 files)
-- `apps/lottery/src/App.tsx` - Added ProtectedRoute wrapper
-- `tests/lottery/auth.spec.ts` - Enabled test 1.5, added TEST_CONFIG
-- `tests/lottery/room-actions.spec.ts` - Added TEST_CONFIG
-- `tests/lottery/room-management.spec.ts` - Added TEST_CONFIG
-- `tests/lottery/room-status.spec.ts` - Added TEST_CONFIG
-- `tests/lottery/winner-draw.spec.ts` - Added TEST_CONFIG
-- `tests/lottery/websocket-events.spec.ts` - Created new file
-- `tests/helpers/auth.ts` - Added TEST_CONFIG
-
----
-
-## ✅ Success Metrics
-
-- ✅ **6 new WebSocket E2E tests** created and passing
-- ✅ **1 skipped test enabled** (test 1.5) and passing
-- ✅ **100% E2E test pass rate** (43/43)
-- ✅ **0 skipped tests** (down from 1)
-- ✅ **Centralized test config** eliminates hardcoded URLs
-- ✅ **Route guards** protect sensitive pages
-- ✅ **Zero test failures** throughout implementation
-- ✅ **3 commits** (all pushed)
+- Error boundaries in React
+- Rate limit error messages
 
 ---
 
 ## 🔍 Known Issues
 
-### Fixed in Session 4
-1. ~~**Post-login redirect** - Not yet implemented (redirects to home)~~ ✅ **FIXED**
-2. ~~**WebSocket room status** - May not broadcast to all users (needs investigation)~~ ✅ **FIXED**
+### Resolved This Session
+1. ~~Post-login redirect~~ ✅ **FIXED**
+2. ~~WebSocket room status not received~~ ✅ **FIXED**
+3. ~~Socket subscription before connect~~ ✅ **FIXED**
 
-### Minor (Not Blocking)
-3. **Token expiry** - No automatic logout on JWT expiry
-4. **Error boundaries** - No React error boundaries in lottery app
-
-### Not Issues (By Design)
-1. ✅ Test 1.5 skipped → Now enabled and passing
-2. ✅ Hardcoded URLs → Now using environment variables
+### Remaining (Not Blocking)
+1. **Token expiry** — No automatic logout on JWT expiry
+2. **Error boundaries** — No React error boundaries in lottery app
 
 ---
 
-## 🤝 Handoff Checklist
+## 🎓 Key Learnings
 
-### Before Next Session
-- [x] Push pending commit: `git push origin master` ✅ Done
-- [x] Verify commit 4b3056f on GitHub ✅ Done
-- [ ] All dev servers stopped cleanly
+### WebSocket Subscription Timing
+- Always check `socket.connected` before emitting
+- Use `socket.once('connect', ...)` to queue emissions for after connection
 
-### Ready for Next Session
-- ✅ All tests passing (43/43)
-- ✅ No compilation errors
-- ✅ Git commit ready to push
-- ✅ Documentation updated
+### WebSocket Security Model
+- Backend requires users to be **participants** to receive room events
+- This is intentional for security (prevents unauthorized access to room data)
+- Tests must add users as participants before expecting WebSocket events
 
-### Recommended Next Task
-**Build Quiz "Who's First?" App** - Real-time infrastructure is ready and fully tested
+### React Router Location State
+- `ProtectedRoute` saves intended location in `state={{ from: location }}`
+- `LoginForm` reads `location.state?.from?.pathname` after login
+- Use `replace: true` to prevent back button returning to login
+
+---
+
+## 📊 Project Statistics
+
+### Code Metrics
+- **Total E2E Tests:** 44 (+1 from Session 3)
+- **Pass Rate:** 100%
+- **Total Commits:** 39
+
+### Test Coverage by Feature
+| Feature | Tests | Status |
+|---------|-------|--------|
+| Authentication | 13 | ✅ |
+| Room CRUD | 6 | ✅ |
+| Room Status | 4 | ✅ |
+| Room Actions | 10 | ✅ |
+| Winner Draw | 7 | ✅ |
+| WebSocket | 6 | ✅ |
+
+---
+
+## 🧪 Running Tests
+
+```bash
+# Full test suite
+pnpm test:e2e
+# Expected: 44 passed (100%)
+
+# Auth tests only
+pnpm test:e2e --grep "User Authentication"
+# Expected: 7 passed
+
+# WebSocket tests only
+pnpm test:e2e --grep "WebSocket"
+# Expected: 6 passed
+```
 
 ---
 
@@ -424,67 +257,50 @@ LOTTERY_URL=http://localhost:5176 pnpm test:e2e
 | charlie@example.com | password123 | Charlie Davis |
 | diana@example.com | password123 | Diana Wilson |
 
-### Port Usage
-- **3000** - Platform backend (Fastify + Socket.io)
-- **5173** - Lottery frontend (Vite, or next available)
-- **5432** - PostgreSQL database
+### Ports
+- **3000** — Platform backend
+- **5173** — Lottery frontend (Vite)
+- **5432** — PostgreSQL
 
 ### Development Commands
 ```bash
-# Start all servers
-pnpm dev
-
-# Run full test suite
-pnpm test:e2e
-
-# Run tests with custom frontend port
-LOTTERY_URL=http://localhost:5176 pnpm test:e2e
-
-# Reset database
-cd platform && pnpm db:reset --force
-
-# Type check
-pnpm type-check
-
-# Build for production
-pnpm build
+pnpm dev          # Start all servers
+pnpm test:e2e     # Run E2E tests
+pnpm type-check   # TypeScript check
+pnpm build        # Production build
 ```
 
-### Key Files
-- `CLAUDE.md` - Project instructions
-- `docs/event-platform-context.md` - Architecture decisions
-- `docs/api/websocket-protocol.md` - WebSocket protocol spec
-- `platform/src/websocket/` - WebSocket implementation
-- `apps/lottery/src/components/ProtectedRoute.tsx` - Route guard
-- `tests/lottery/websocket-events.spec.ts` - WebSocket E2E tests
-- `tests/helpers/config.ts` - Test configuration
+---
+
+## ✅ Session 4 Checklist
+
+- [x] Post-login redirect implemented
+- [x] WebSocket room status listeners added
+- [x] Socket subscription timing fixed
+- [x] TypeScript error fixed
+- [x] Test 1.6 added and passing
+- [x] Test 8.5 fixed and passing
+- [x] All 44 tests passing
+- [x] Changes committed and pushed
+- [x] Handoff documentation updated
 
 ---
 
-## 📊 Session Timeline
+## 🎯 Session 4 Goals Achieved
 
-**Session 1 (Dec 27):** E2E infrastructure, basic tests (1/37 passing)
-**Session 2 (Jan 3, morning):** WebSocket backend implementation (36/36 passing, 1 skipped)
-**Session 3 (Jan 3, afternoon):** WebSocket E2E tests + Route guards (43/43 passing, 0 skipped) ← **YOU ARE HERE**
-
----
-
-## 🎯 Session 3 Goals Achieved
-
-✅ Created comprehensive WebSocket E2E test suite (6 tests)
-✅ Fixed all hardcoded URL issues across test suite
-✅ Implemented route guards for protected routes
-✅ Enabled previously skipped test 1.5
-✅ Achieved 100% test pass rate (43/43)
-✅ Zero skipped tests (down from 1)
-✅ All code committed (1 commit pending push)
+✅ Fixed both "not implemented" features from Session 3
+✅ Discovered and fixed WebSocket subscription timing bug
+✅ Added new test for post-login redirect
+✅ Fixed flaky test 8.5 with proper participant setup
+✅ 44/44 tests passing (100%)
+✅ All changes committed and pushed
 
 ---
 
 **Session Status:** ✅ **COMPLETE**
 **Test Coverage:** 🟢 **EXCELLENT** (100% pass rate)
 **Code Quality:** 🟢 **PRODUCTION READY**
-**Next Action:** Push commit + Build Quiz App or enhance existing features
+**Next Action:** Build Quiz "Who's First?" App
 
-**Last Updated:** January 3, 2026
-**Ready for:** Session 4
+**Last Updated:** January 4, 2026
+**Ready for:** Session 5
