@@ -191,13 +191,18 @@ test.describe('TS-L-008: WebSocket Real-Time Events', () => {
   });
 
   test('8.5: Room Status Change - Real-time Update', async ({ page, context, request }) => {
-    // Create a draft room via API
+    // Create a draft room via API and add Bob as participant
     const { loginAsUser } = await import('../helpers/auth');
-    const { createTestRoom } = await import('../helpers/fixtures');
+    const { createTestRoom, joinRoom } = await import('../helpers/fixtures');
     const aliceToken = await loginAsUser(request, 'alice');
+    const bobToken = await loginAsUser(request, 'bob');
+
     const draftRoom = await createTestRoom(request, aliceToken, {
       name: `WebSocket Draft Room ${Date.now()}`,
     });
+
+    // Add Bob as participant (required for WebSocket subscription)
+    await joinRoom(request, bobToken, draftRoom.id);
 
     // Alice navigates to the draft room
     await page.goto(`${TEST_CONFIG.lotteryUrl}/room/${draftRoom.id}`);
@@ -215,6 +220,9 @@ test.describe('TS-L-008: WebSocket Real-Time Events', () => {
     await bobPage.goto(`${TEST_CONFIG.lotteryUrl}/room/${draftRoom.id}`);
     await bobPage.waitForLoadState('networkidle');
 
+    // Give WebSocket time to connect and subscribe
+    await bobPage.waitForTimeout(1000);
+
     // Verify both users can see the draft room
     await expect(page.locator('span:has-text("DRAFT")')).toBeVisible();
     await expect(bobPage.locator('span:has-text("DRAFT")')).toBeVisible();
@@ -229,8 +237,9 @@ test.describe('TS-L-008: WebSocket Real-Time Events', () => {
       // Wait for Alice's page to update
       await expect(page.locator('text=ACTIVE')).toBeVisible({ timeout: 5000 });
 
-      // Note: Real-time WebSocket update to Bob's page is tested by other tests
-      // This test validates the room creation and status change mechanism
+      // Bob should receive the status change via WebSocket (room:status_changed event)
+      // This validates that the frontend now listens to room:status_changed
+      await expect(bobPage.locator('text=ACTIVE')).toBeVisible({ timeout: 5000 });
     }
 
     await bobPage.close();

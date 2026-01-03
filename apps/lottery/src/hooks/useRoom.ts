@@ -94,10 +94,26 @@ export function useRoom(roomId: string | undefined) {
       }));
     };
 
+    const handleRoomUpdated = (data: { room: RoomWithRelations }) => {
+      setState(s => ({
+        ...s,
+        room: data.room,
+      }));
+    };
+
+    const handleRoomStatusChanged = (data: { oldStatus: string; newStatus: string }) => {
+      setState(s => ({
+        ...s,
+        room: s.room ? { ...s.room, status: data.newStatus as RoomWithRelations['status'] } : null,
+      }));
+    };
+
     socket.on('participant:joined', handleParticipantJoined);
     socket.on('participant:left', handleParticipantLeft);
     socket.on('winner:selected', handleWinnerSelected);
     socket.on('prize:created', handlePrizeCreated);
+    socket.on('room:updated', handleRoomUpdated);
+    socket.on('room:status_changed', handleRoomStatusChanged);
 
     return () => {
       unsubscribeFromRoom(roomId);
@@ -105,6 +121,8 @@ export function useRoom(roomId: string | undefined) {
       socket.off('participant:left', handleParticipantLeft);
       socket.off('winner:selected', handleWinnerSelected);
       socket.off('prize:created', handlePrizeCreated);
+      socket.off('room:updated', handleRoomUpdated);
+      socket.off('room:status_changed', handleRoomStatusChanged);
     };
   }, [roomId, fetchRoom]);
 

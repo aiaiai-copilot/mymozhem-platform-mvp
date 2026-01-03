@@ -104,7 +104,26 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('1.6: Multiple Users Can Login in Different Sessions', async ({ page, context }) => {
+  test('1.6: Redirect Back to Protected Route After Login', async ({ page }) => {
+    // Try to access protected route without being logged in
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/create`);
+
+    // Should redirect to login page
+    await expect(page).toHaveURL(/\/login/);
+
+    // Login
+    await page.fill('input[type="email"]', TEST_USERS.alice.email);
+    await page.fill('input[type="password"]', TEST_USERS.alice.password);
+    await page.click('button:has-text("Login")');
+
+    // Should redirect back to the originally requested /create page
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/create`);
+
+    // Verify we're on the create room page
+    await expect(page.locator('h1:has-text("Create")')).toBeVisible();
+  });
+
+  test('1.7: Multiple Users Can Login in Different Sessions', async ({ page, context }) => {
     // Login as Alice in first tab
     await loginViaUI(page, 'alice');
     await expect(page.locator('header').locator(`text=${TEST_USERS.alice.name}`)).toBeVisible();

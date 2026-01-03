@@ -17,9 +17,18 @@ export function disconnect() {
 }
 
 export function subscribeToRoom(roomId: string) {
-  socket.emit('room:subscribe', { roomId });
+  if (socket.connected) {
+    socket.emit('room:subscribe', { roomId });
+  } else {
+    // Wait for connection then subscribe
+    socket.once('connect', () => {
+      socket.emit('room:subscribe', { roomId });
+    });
+  }
 }
 
 export function unsubscribeFromRoom(roomId: string) {
-  socket.emit('room:unsubscribe', { roomId });
+  if (socket.connected) {
+    socket.emit('room:unsubscribe', { roomId });
+  }
 }

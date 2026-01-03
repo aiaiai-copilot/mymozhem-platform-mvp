@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+
+interface LocationState {
+  from?: { pathname: string };
+}
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -9,6 +13,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,7 +22,10 @@ export function LoginForm() {
 
     try {
       await login(email, password);
-      navigate('/');
+      // Redirect to the page user tried to access, or home
+      const state = location.state as LocationState;
+      const redirectTo = state?.from?.pathname || '/';
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

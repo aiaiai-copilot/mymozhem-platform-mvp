@@ -9,7 +9,7 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-interface AuthContextType extends AuthState {
+export interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
 }
