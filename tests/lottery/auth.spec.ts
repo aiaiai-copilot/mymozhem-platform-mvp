@@ -96,11 +96,7 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await expect(page.locator('button:has-text("Logout")')).toBeVisible();
   });
 
-  test.skip('1.5: Redirect to Login When Accessing Protected Route', async ({ page }) => {
-    // TODO: Implement protected routes in the app
-    // Currently, the app allows access to all routes without authentication
-    // This test should be enabled after implementing route guards
-
+  test('1.5: Redirect to Login When Accessing Protected Route', async ({ page }) => {
     // Try to access protected route without being logged in
     await page.goto(`${TEST_CONFIG.lotteryUrl}/create`);
 
