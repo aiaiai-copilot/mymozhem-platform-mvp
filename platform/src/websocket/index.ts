@@ -9,6 +9,12 @@ import type { FastifyInstance } from 'fastify';
 import { config } from '../config/index.js';
 import { authenticateSocket } from './auth.js';
 import { handleRoomSubscription, handleRoomUnsubscription } from './rooms.js';
+import {
+  handleShowQuestion,
+  handleQuizAnswer,
+  handleQuizFinished,
+  handleQuizStart,
+} from './quiz.js';
 
 export let io: SocketIOServer;
 
@@ -52,6 +58,43 @@ export async function initializeWebSocket(fastify: FastifyInstance) {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unsubscription failed';
         fastify.log.error(`Room unsubscription error: ${message}`);
+      }
+    });
+
+    // Quiz events
+    socket.on('quiz:show_question', async (data) => {
+      try {
+        await handleShowQuestion(socket, data, fastify.log);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Show question failed';
+        fastify.log.error(`Quiz show question error: ${message}`);
+      }
+    });
+
+    socket.on('quiz:answer', async (data) => {
+      try {
+        await handleQuizAnswer(socket, data, fastify.log);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Answer submission failed';
+        fastify.log.error(`Quiz answer error: ${message}`);
+      }
+    });
+
+    socket.on('quiz:finished', async (data) => {
+      try {
+        await handleQuizFinished(socket, data, fastify.log);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Quiz finish failed';
+        fastify.log.error(`Quiz finish error: ${message}`);
+      }
+    });
+
+    socket.on('quiz:start', async (data) => {
+      try {
+        await handleQuizStart(socket, data, fastify.log);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Quiz start failed';
+        fastify.log.error(`Quiz start error: ${message}`);
       }
     });
 
