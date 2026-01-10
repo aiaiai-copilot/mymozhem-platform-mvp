@@ -828,6 +828,41 @@ pnpm type-check
 
 ---
 
+## Session 7 (Final): Quiz Protocol Documentation
+
+**Date:** January 10, 2026
+**Focus:** Document quiz WebSocket events
+
+### Created docs/api/quiz-protocol.md
+
+Complete quiz WebSocket protocol specification including:
+
+**Client Events:**
+- `quiz:start` - Start quiz session
+- `quiz:show_question` - Display next question (organizer)
+- `quiz:answer` - Submit answer with timestamp (participant)
+- `quiz:end` - End quiz and show results
+
+**Server Events:**
+- `quiz:question_shown` - Question broadcast to all participants
+- `quiz:answer_submitted` - Someone submitted an answer
+- `quiz:round_winner` - First correct answer wins
+- `quiz:status_changed` - Quiz state transition
+- `quiz:finished` - Final leaderboard
+
+**Additional Content:**
+- Quiz flow diagram
+- appSettings schema (questions, status, currentIndex)
+- Winner metadata structure
+- React hook implementation example
+- Timing considerations and race condition handling
+
+### Updated Related Docs
+- `docs/api/websocket-protocol.md` - Added quiz protocol reference
+- `docs/api/README.md` - Added quiz-protocol.md to quick links
+
+---
+
 **Last Updated:** January 10, 2026
-**Status:** ✅ MVP Complete | 76/76 tests | Deployment docs ready
-**Next Action:** Quiz protocol docs, Google OAuth, or actual deployment
+**Status:** ✅ MVP Complete | 76/76 tests | All docs ready
+**Next Action:** Google OAuth implementation or actual deployment
