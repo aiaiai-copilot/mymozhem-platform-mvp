@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { loginViaUI, TEST_USERS } from '../helpers/auth';
-import { TEST_CONFIG } from '../helpers/config';
+import { loginViaUI, TEST_USERS } from '../../../tests/helpers/auth';
+import { TEST_CONFIG } from '../../../tests/helpers/config';
 
 
 /**

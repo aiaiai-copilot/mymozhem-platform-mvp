@@ -153,20 +153,32 @@ async function main() {
         settings: {
           type: 'object',
           properties: {
-            questionCount: {
-              type: 'integer',
-              minimum: 1,
-              maximum: 50,
-              description: 'Number of questions in quiz',
+            questions: {
+              type: 'array',
+              description: 'Array of quiz questions',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  text: { type: 'string' },
+                  options: { type: 'array', items: { type: 'string' } },
+                  correctIndex: { type: 'integer' },
+                  timeLimit: { type: 'integer' },
+                },
+                required: ['id', 'text', 'options', 'correctIndex'],
+              },
             },
-            timeLimit: {
+            currentQuestionIndex: {
               type: 'integer',
-              minimum: 10,
-              maximum: 300,
-              description: 'Time limit per question in seconds',
+              description: 'Index of current question (-1 = not started)',
+            },
+            quizStatus: {
+              type: 'string',
+              enum: ['WAITING', 'QUESTION_ACTIVE', 'BETWEEN_ROUNDS', 'FINISHED'],
+              description: 'Current quiz state',
             },
           },
-          required: ['questionCount', 'timeLimit'],
+          required: ['questions', 'currentQuestionIndex', 'quizStatus'],
         },
       },
     },
@@ -202,8 +214,28 @@ async function main() {
       appId: quizApp.appId,
       appManifestVersion: quizApp.manifestVersion,
       appSettings: {
-        questionCount: 10,
-        timeLimit: 30,
+        questions: [
+          {
+            id: 'q1',
+            text: 'What is traditionally placed on top of a Christmas tree?',
+            options: ['Star', 'Bell', 'Snowflake', 'Candy Cane'],
+            correctIndex: 0,
+          },
+          {
+            id: 'q2',
+            text: 'How many reindeer does Santa have (including Rudolph)?',
+            options: ['7', '8', '9', '10'],
+            correctIndex: 2,
+          },
+          {
+            id: 'q3',
+            text: 'What country started the tradition of putting up a Christmas tree?',
+            options: ['USA', 'England', 'Germany', 'France'],
+            correctIndex: 2,
+          },
+        ],
+        currentQuestionIndex: -1,
+        quizStatus: 'WAITING',
       },
       status: RoomStatus.ACTIVE,
       isPublic: true,

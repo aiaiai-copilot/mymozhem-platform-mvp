@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TEST_USERS } from '../helpers/auth';
+import { TEST_USERS } from '../../tests/helpers/auth';
 
 /**
  * TS-P-001: User Authentication (REST API)

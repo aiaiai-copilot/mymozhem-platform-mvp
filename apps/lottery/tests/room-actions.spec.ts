@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { loginAsUser, loginViaUI, TEST_USERS } from '../helpers/auth';
-import { createTestRoom, updateRoomStatus, joinRoom } from '../helpers/fixtures';
-import { TEST_CONFIG } from '../helpers/config';
+import { loginAsUser, loginViaUI, TEST_USERS } from '../../../tests/helpers/auth';
+import { createTestRoom, updateRoomStatus, joinRoom } from '../../../tests/helpers/fixtures';
+import { TEST_CONFIG } from '../../../tests/helpers/config';
 
 
 /**

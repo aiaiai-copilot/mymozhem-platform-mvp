@@ -10,8 +10,8 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { TEST_CONFIG } from '../helpers/config';
-import { loginViaUI, TEST_USERS } from '../helpers/auth';
+import { TEST_CONFIG } from '../../../tests/helpers/config';
+import { loginViaUI, TEST_USERS } from '../../../tests/helpers/auth';
 
 test.describe('TS-L-008: WebSocket Real-Time Events', () => {
   test.beforeEach(async ({ page }) => {
@@ -192,8 +192,8 @@ test.describe('TS-L-008: WebSocket Real-Time Events', () => {
 
   test('8.5: Room Status Change - Real-time Update', async ({ page, context, request }) => {
     // Create a draft room via API and add Bob as participant
-    const { loginAsUser } = await import('../helpers/auth');
-    const { createTestRoom, joinRoom } = await import('../helpers/fixtures');
+    const { loginAsUser } = await import('../../../tests/helpers/auth');
+    const { createTestRoom, joinRoom } = await import('../../../tests/helpers/fixtures');
     const aliceToken = await loginAsUser(request, 'alice');
     const bobToken = await loginAsUser(request, 'bob');
 

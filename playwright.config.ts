@@ -3,16 +3,21 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright configuration for Event Platform E2E tests
  *
- * Test structure:
- * - tests/platform/ - Platform API tests
- * - tests/lottery/ - Lottery app UI tests
+ * Test structure (colocated with apps):
+ * - platform/tests/ - Platform API tests
+ * - apps/lottery/tests/ - Lottery app UI tests
+ * - apps/quiz/tests/ - Quiz app UI tests
  * - tests/helpers/ - Shared utilities
  */
 export default defineConfig({
-  testDir: './tests',
+  testDir: '.',
+  testMatch: [
+    'platform/tests/**/*.spec.ts',
+    'apps/*/tests/**/*.spec.ts',
+  ],
   timeout: 30000,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 2, // Reduced from 4 to avoid overwhelming backend
+  workers: process.env.CI ? 1 : 2,
 
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],
@@ -28,17 +33,25 @@ export default defineConfig({
   projects: [
     {
       name: 'platform-api',
-      testMatch: 'tests/platform/**/*.spec.ts',
+      testMatch: 'platform/tests/**/*.spec.ts',
       use: {
         baseURL: 'http://127.0.0.1:3000',
       },
     },
     {
       name: 'lottery-app',
-      testMatch: 'tests/lottery/**/*.spec.ts',
+      testMatch: 'apps/lottery/tests/**/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:5173',
+      },
+    },
+    {
+      name: 'quiz-app',
+      testMatch: 'apps/quiz/tests/**/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:5174',
       },
     },
   ],
