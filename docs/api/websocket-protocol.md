@@ -460,71 +460,28 @@ socket.on('lottery:draw_started', (data) => {
 - Event name must start with `{appId}:` (e.g., `lottery:*`)
 - Maximum 10 events per second per room
 
-### Quiz Example (Real-time Synchronous)
+### Quiz "Who's First?" Protocol
 
-**Question Published:**
-```javascript
-socket.on('quiz:question_published', (data) => {
-  console.log('New question:', data);
-});
-```
+For detailed Quiz app WebSocket events, see **[Quiz Protocol](./quiz-protocol.md)**.
 
-**Payload:**
-```json
-{
-  "questionId": "q_123",
-  "questionNumber": 1,
-  "totalQuestions": 10,
-  "question": "What is the capital of France?",
-  "options": ["London", "Berlin", "Paris", "Madrid"],
-  "timeLimit": 10,
-  "startTime": "2025-01-15T10:00:00Z"
-}
-```
+**Quick Reference:**
 
-**Answer Submitted (Client → Server):**
-```javascript
-socket.emit('quiz:answer_submit', {
-  questionId: 'q_123',
-  answer: 'Paris',
-  timestamp: Date.now()
-}, (response) => {
-  console.log('Answer result:', response);
-});
-```
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `quiz:question_shown` | Server → Client | Question broadcast to participants |
+| `quiz:answer_submitted` | Server → Client | Someone submitted an answer |
+| `quiz:round_winner` | Server → Client | First correct answer announced |
+| `quiz:status_changed` | Server → Client | Quiz state transition |
+| `quiz:finished` | Server → Client | Final leaderboard |
 
-**Response (Server → Client):**
-```json
-{
-  "success": true,
-  "correct": true,
-  "responseTime": 3.2,
-  "rank": 1
-}
-```
+**Client Events:**
 
-**Answer Result Broadcasted:**
-```javascript
-socket.on('quiz:answer_result', (data) => {
-  console.log('Answer result:', data);
-});
-```
-
-**Payload:**
-```json
-{
-  "questionId": "q_123",
-  "participantId": "part_123abc",
-  "user": {
-    "id": "usr_abc123",
-    "name": "John Doe"
-  },
-  "correct": true,
-  "responseTime": 3.2,
-  "rank": 1,
-  "timestamp": "2025-01-15T10:00:03Z"
-}
-```
+| Event | Description |
+|-------|-------------|
+| `quiz:start` | Start quiz session |
+| `quiz:show_question` | Display next question |
+| `quiz:answer` | Submit answer with timestamp |
+| `quiz:end` | End quiz and show results |
 
 ---
 

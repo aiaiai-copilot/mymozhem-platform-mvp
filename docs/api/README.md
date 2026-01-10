@@ -8,6 +8,7 @@ Complete REST API and WebSocket protocol documentation for the Event Management 
 - [Authentication & Authorization](./authentication.md) - OAuth, API keys, permissions
 - [REST API Endpoints](./rest-endpoints.md) - Complete endpoint reference
 - [WebSocket Protocol](./websocket-protocol.md) - Real-time event specification
+- [Quiz Protocol](./quiz-protocol.md) - Quiz app WebSocket events
 - [API Versioning Strategy](./versioning-strategy.md) - Version management and migration
 - [Design Decisions](./design-decisions.md) - Architecture rationale
 - [App Manifest Specification](./app-manifest.md) - Application integration guide
