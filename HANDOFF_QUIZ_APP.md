@@ -758,10 +758,56 @@ appSettings schema:
 
 ### Next Session Options
 
-1. **Create deployment docs** - Start with Railway + Vercel guides
+1. ~~**Create deployment docs**~~ - ✅ Done (Session 7 continued)
 2. **Document quiz protocol** - Complete WebSocket docs
 3. **Implement Google OAuth** - Then document it
 4. **Actually deploy** - Learn by doing, document after
+
+---
+
+## Session 7 (Continued): Deployment Documentation Created
+
+**Date:** January 10, 2026
+**Focus:** Create deployment documentation
+
+### Documents Created
+
+```
+docs/deployment/
+├── README.md                    # Overview + architecture diagram
+├── railway-setup.md             # Platform backend deployment (Railway)
+├── vercel-setup.md              # Frontend apps deployment (Vercel)
+├── environment-variables.md     # Complete env var reference
+└── production-checklist.md      # Pre-launch verification checklist
+```
+
+### Key Content
+
+**Railway Setup:**
+- PostgreSQL database configuration
+- Environment variables (JWT_SECRET, CORS_ORIGIN, etc.)
+- Build commands for monorepo
+- Health check endpoint
+- Troubleshooting guide
+
+**Vercel Setup:**
+- Lottery and Quiz app deployment
+- SPA routing configuration (vercel.json)
+- Environment variables (VITE_PLATFORM_URL)
+- CORS configuration updates
+
+**Environment Variables:**
+- Development vs Production configs
+- Security guidelines (secret rotation, etc.)
+- Variable format details (DATABASE_URL, JWT)
+- Troubleshooting table
+
+**Production Checklist:**
+- Pre-deployment (code quality, security, database)
+- Deployment steps (Railway, Vercel, cross-service)
+- Post-deployment verification
+- Monitoring and maintenance
+- Incident response
 
 ---
 
@@ -779,3 +825,9 @@ pnpm test:e2e
 # Type check
 pnpm type-check
 ```
+
+---
+
+**Last Updated:** January 10, 2026
+**Status:** ✅ MVP Complete | 76/76 tests | Deployment docs ready
+**Next Action:** Quiz protocol docs, Google OAuth, or actual deployment
