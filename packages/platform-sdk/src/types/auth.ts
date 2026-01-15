@@ -41,3 +41,20 @@ export interface RefreshTokenResponse {
  * Current user response (GET /auth/me)
  */
 export type CurrentUserResponse = User;
+
+/**
+ * Google OAuth URL response
+ */
+export interface GoogleAuthUrlResponse {
+  url: string;
+}
+
+/**
+ * OAuth callback tokens (parsed from URL fragment)
+ */
+export interface OAuthCallbackTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  redirectUrl: string;
+}

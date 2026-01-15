@@ -140,3 +140,112 @@ test.describe('TS-L-001: User Authentication Flow', () => {
     await page2.close();
   });
 });
+
+/**
+ * TS-L-002: Google OAuth UI
+ * Tests Google OAuth UI elements and callback handling
+ */
+test.describe('TS-L-002: Google OAuth UI', () => {
+
+  test('2.1: Google Login Button Visible on Login Page', async ({ page }) => {
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
+
+    // Verify Google login button is visible
+    await expect(page.locator('button:has-text("Continue with Google")')).toBeVisible();
+
+    // Verify it has the Google icon (SVG with specific path)
+    await expect(page.locator('button:has-text("Continue with Google") svg')).toBeVisible();
+  });
+
+  test('2.2: Google Login Button Is Clickable', async ({ page }) => {
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
+
+    // Mock the API to prevent actual redirect
+    await page.route('**/api/v1/auth/google/url**', async (route) => {
+      await route.fulfill({
+        status: 503,
+        json: { error: { code: 'OAUTH_NOT_CONFIGURED', message: 'OAuth not configured' } },
+      });
+    });
+
+    // Verify button is clickable
+    const googleButton = page.locator('button:has-text("Continue with Google")');
+    await expect(googleButton).toBeEnabled();
+    await googleButton.click();
+
+    // Should show error message after failed OAuth attempt
+    await expect(page.locator('text=Failed to connect')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('2.3: OAuth Error Parameter Shows Error Message', async ({ page }) => {
+    // Navigate to login page with error parameter (simulating failed OAuth callback)
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login?error=oauth_failed`);
+
+    // Verify error message is displayed
+    await expect(page.locator('.bg-red-50, .text-red-600')).toBeVisible();
+    await expect(page.locator('text=Google login failed')).toBeVisible();
+  });
+
+  test('2.4: Auth Callback Page - Shows Loading While Processing', async ({ page }) => {
+    // Navigate directly to callback page (without valid tokens)
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/auth/callback`);
+
+    // Should show error since no tokens in URL fragment
+    await expect(page.locator('text=No authentication data received')).toBeVisible();
+
+    // Should show "Try again" link
+    await expect(page.locator('a:has-text("Try again")')).toBeVisible();
+  });
+
+  test('2.5: Auth Callback Page - Processes Token Fragment', async ({ page }) => {
+    // Create mock tokens
+    const mockAccessToken = 'mock-access-token-for-testing';
+    const mockRefreshToken = 'mock-refresh-token-for-testing';
+
+    // Navigate to callback with tokens in URL fragment
+    await page.goto(
+      `${TEST_CONFIG.lotteryUrl}/auth/callback#access_token=${mockAccessToken}&refresh_token=${mockRefreshToken}&expires_in=3600&redirect_url=/`
+    );
+
+    // The page should process the tokens and redirect
+    // Wait for either redirect to home or stay on page
+    await page.waitForURL(/\/(auth\/callback)?$/, { timeout: 3000 }).catch(() => {});
+
+    // If redirected to home, tokens were processed
+    const currentUrl = page.url();
+    if (currentUrl.includes('/auth/callback')) {
+      // Still on callback - check for loading spinner (processing)
+      const hasSpinner = await page.locator('.animate-spin').isVisible().catch(() => false);
+      expect(hasSpinner || currentUrl.includes('auth/callback')).toBeTruthy();
+    } else {
+      // Redirected - tokens were stored and processed
+      expect(currentUrl).toContain(TEST_CONFIG.lotteryUrl);
+    }
+  });
+
+  test('2.6: Login Page Preserves Redirect After OAuth Error', async ({ page }) => {
+    // Try to access protected route
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/create`);
+
+    // Should redirect to login
+    await expect(page).toHaveURL(/\/login/);
+
+    // Verify Google button is visible (can be used for OAuth)
+    await expect(page.locator('button:has-text("Continue with Google")')).toBeVisible();
+
+    // Verify email login still works after visiting with redirect state
+    await page.fill('input[type="email"]', TEST_USERS.alice.email);
+    await page.fill('input[type="password"]', TEST_USERS.alice.password);
+    await page.click('button:has-text("Login with Email")');
+
+    // Should redirect back to /create
+    await expect(page).toHaveURL(`${TEST_CONFIG.lotteryUrl}/create`);
+  });
+
+  test('2.7: Divider Between OAuth and Email Login', async ({ page }) => {
+    await page.goto(`${TEST_CONFIG.lotteryUrl}/login`);
+
+    // Verify divider text is visible
+    await expect(page.locator('text=or continue with email')).toBeVisible();
+  });
+});

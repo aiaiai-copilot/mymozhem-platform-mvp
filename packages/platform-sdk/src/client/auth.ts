@@ -10,6 +10,8 @@ import type {
   RefreshTokenRequest,
   RefreshTokenResponse,
   CurrentUserResponse,
+  GoogleAuthUrlResponse,
+  OAuthCallbackTokens,
 } from '../types/auth.js';
 
 /**
@@ -46,5 +48,38 @@ export class AuthClient extends BaseClient {
    */
   async me(): Promise<ApiResponse<CurrentUserResponse>> {
     return this.doGet<CurrentUserResponse>(`${this.basePath}/me`);
+  }
+
+  /**
+   * Get Google OAuth URL for redirect
+   * @param redirectUrl - URL to redirect after successful auth
+   */
+  async getGoogleAuthUrl(redirectUrl?: string): Promise<ApiResponse<GoogleAuthUrlResponse>> {
+    const params = redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : '';
+    return this.doGet<GoogleAuthUrlResponse>(`${this.basePath}/google/url${params}`);
+  }
+
+  /**
+   * Parse OAuth callback tokens from URL fragment
+   * @param fragment - URL fragment (everything after #)
+   * @returns Parsed tokens or null if invalid
+   */
+  parseOAuthCallback(fragment: string): OAuthCallbackTokens | null {
+    const params = new URLSearchParams(fragment);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const expiresIn = params.get('expires_in');
+    const redirectUrl = params.get('redirect_url');
+
+    if (!accessToken || !refreshToken || !expiresIn) {
+      return null;
+    }
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: parseInt(expiresIn, 10),
+      redirectUrl: redirectUrl ? decodeURIComponent(redirectUrl) : '/',
+    };
   }
 }

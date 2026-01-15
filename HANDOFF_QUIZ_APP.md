@@ -933,6 +933,160 @@ docs/
 
 ---
 
-**Last Updated:** January 10, 2026
-**Status:** ✅ MVP Complete | 76/76 tests | All docs complete
-**Next Action:** Google OAuth implementation or actual deployment
+---
+
+---
+
+## Session 8: Google OAuth Implementation
+
+**Date:** January 15, 2026
+**Focus:** Implement Google OAuth authentication across platform and both apps
+
+### What Was Done
+
+1. **Platform Backend - OAuth Plugin Registration**
+   - Modified `platform/src/index.ts` - Registered `@fastify/oauth2` plugin with Google configuration
+   - Only enables OAuth when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set
+
+2. **Platform Backend - OAuth Routes**
+   - Modified `platform/src/routes/auth.ts` - Added two endpoints:
+     - `GET /api/v1/auth/google/url` - Returns Google OAuth URL for frontend redirect
+     - `GET /api/v1/auth/google/callback` - Handles OAuth callback, creates/finds user, issues JWT
+   - State parameter with timestamp prevents replay attacks
+   - Tokens passed in URL fragment (security best practice)
+
+3. **SDK Updates**
+   - Modified `packages/platform-sdk/src/types/auth.ts` - Added `GoogleAuthUrlResponse`, `OAuthCallbackTokens`
+   - Modified `packages/platform-sdk/src/client/auth.ts` - Added:
+     - `getGoogleAuthUrl(redirectUrl?)` - Fetches OAuth URL from backend
+     - `parseOAuthCallback(fragment)` - Parses tokens from URL fragment
+
+4. **Frontend - Lottery App**
+   - Created `apps/lottery/src/components/GoogleLoginButton.tsx` - Google button with loading state
+   - Created `apps/lottery/src/pages/AuthCallbackPage.tsx` - Handles OAuth callback
+   - Modified `apps/lottery/src/components/LoginForm.tsx` - Added Google button + divider
+   - Modified `apps/lottery/src/App.tsx` - Added `/auth/callback` route
+
+5. **Frontend - Quiz App**
+   - Same changes as lottery app with purple theme
+
+6. **Infrastructure**
+   - Created `docker-compose.yml` - PostgreSQL for local development
+
+### Tests Added (16 tests, all passing)
+
+**Platform API (`platform/tests/auth.spec.ts`):**
+- 2.1: Get Google OAuth URL - Returns Valid URL
+- 2.2: Get Google OAuth URL - With Redirect URL Parameter
+- 2.3: Google OAuth Callback - Without Code Returns Error
+
+**Lottery App (`apps/lottery/tests/auth.spec.ts`):**
+- 2.1: Google Login Button Visible on Login Page
+- 2.2: Google Login Button Is Clickable
+- 2.3: OAuth Error Parameter Shows Error Message
+- 2.4: Auth Callback Page - Shows Loading While Processing
+- 2.5: Auth Callback Page - Processes Token Fragment
+- 2.6: Login Page Preserves Redirect After OAuth Error
+- 2.7: Divider Between OAuth and Email Login
+
+**Quiz App (`apps/quiz/tests/auth.spec.ts`):**
+- 2.1-2.6: Same coverage as lottery app (6 tests)
+
+### Files Changed
+
+**New Files:**
+```
+apps/lottery/src/components/GoogleLoginButton.tsx
+apps/lottery/src/pages/AuthCallbackPage.tsx
+apps/quiz/src/components/GoogleLoginButton.tsx
+apps/quiz/src/pages/AuthCallbackPage.tsx
+docker-compose.yml
+HANDOFF_GOOGLE_OAUTH.md
+```
+
+**Modified Files:**
+```
+platform/src/index.ts                           # OAuth plugin registration
+platform/src/routes/auth.ts                     # OAuth endpoints (+150 lines)
+packages/platform-sdk/src/types/auth.ts         # OAuth types
+packages/platform-sdk/src/client/auth.ts        # OAuth methods
+apps/lottery/src/components/LoginForm.tsx       # Google button + divider
+apps/lottery/src/App.tsx                        # /auth/callback route
+apps/lottery/tests/auth.spec.ts                 # 7 new OAuth tests
+apps/quiz/src/components/LoginForm.tsx          # Google button + divider
+apps/quiz/src/App.tsx                           # /auth/callback route
+apps/quiz/tests/auth.spec.ts                    # 6 new OAuth tests
+platform/tests/auth.spec.ts                     # 3 new OAuth tests
+```
+
+### Test Results
+
+```
+Platform API:   9 tests  ✅ (6 existing + 3 OAuth)
+Lottery App:   45 tests  ✅ (38 existing + 7 OAuth)
+Quiz App:      38 tests  ✅ (32 existing + 6 OAuth)
+─────────────────────────────────────────────────
+Total:         92 tests  ✅
+```
+
+### OAuth Flow
+
+```
+1. User clicks "Continue with Google"
+2. Frontend calls GET /api/v1/auth/google/url
+3. Backend returns Google OAuth URL with state parameter
+4. Frontend redirects to Google
+5. User authenticates with Google
+6. Google redirects to /api/v1/auth/google/callback
+7. Backend exchanges code for Google token
+8. Backend fetches user info from Google API
+9. Backend creates/finds user in database
+10. Backend generates platform JWT tokens
+11. Backend redirects to /auth/callback#access_token=...
+12. Frontend parses tokens from URL fragment
+13. Frontend stores tokens in localStorage
+14. Frontend connects WebSocket with token
+15. Frontend redirects to intended page
+```
+
+### To Enable Google OAuth in Production
+
+```env
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_CALLBACK_URL=https://your-domain.com/api/v1/auth/google/callback
+```
+
+### Windows Development Notes
+
+- Docker requires elevated privileges (use Docker Desktop terminal or Admin PowerShell)
+- PowerShell mangles `-e VAR=value` syntax - use Git Bash or `--env VAR=value`
+
+---
+
+## Quick Start
+
+```bash
+# Start PostgreSQL
+docker compose up -d
+
+# Start all servers
+cd platform && pnpm dev:test
+pnpm --filter @event-platform/lottery dev
+pnpm --filter @event-platform/quiz dev
+
+# Run all tests
+pnpm test:e2e
+
+# Run OAuth tests only
+pnpm playwright test --grep "Google OAuth"
+
+# Type check
+pnpm type-check
+```
+
+---
+
+**Last Updated:** January 15, 2026
+**Status:** ✅ MVP Complete | 92/92 tests | Google OAuth implemented
+**Next Action:** Production deployment (Railway + Vercel)

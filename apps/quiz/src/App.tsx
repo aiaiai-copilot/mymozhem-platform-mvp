@@ -6,6 +6,7 @@ import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { QuizRoomPage } from '@/pages/QuizRoomPage';
 import { CreateQuizPage } from '@/pages/CreateQuizPage';
+import { AuthCallbackPage } from '@/pages/AuthCallbackPage';
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="login" element={<LoginPage />} />
+            <Route path="auth/callback" element={<AuthCallbackPage />} />
             <Route
               path="quiz/:roomId"
               element={

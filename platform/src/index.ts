@@ -7,6 +7,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import oauth2 from '@fastify/oauth2';
 import { config } from './config/index.js';
 import { prisma } from './db.js';
 
@@ -35,6 +36,26 @@ await fastify.register(cors, {
   origin: config.corsOrigin,
   credentials: true,
 });
+
+// Register Google OAuth2 (only if credentials are configured)
+if (config.google.clientId && config.google.clientSecret) {
+  await fastify.register(oauth2, {
+    name: 'googleOAuth2',
+    scope: ['openid', 'email', 'profile'],
+    credentials: {
+      client: {
+        id: config.google.clientId,
+        secret: config.google.clientSecret,
+      },
+      auth: oauth2.GOOGLE_CONFIGURATION,
+    },
+    startRedirectPath: '/api/v1/auth/google',
+    callbackUri: config.google.callbackUrl,
+  });
+  fastify.log.info('✓ Google OAuth2 enabled');
+} else {
+  fastify.log.warn('⚠ Google OAuth2 disabled (missing credentials)');
+}
 
 // Register rate limiting (disabled in test mode)
 if (config.nodeEnv !== 'test') {
