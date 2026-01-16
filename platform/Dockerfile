@@ -1,52 +1,60 @@
 # Production Dockerfile for Event Platform Backend
 # Multi-stage build for minimal image size
+# Uses Debian-based image for Prisma/OpenSSL compatibility
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+RUN npm install -g pnpm@8.15.0
 
 WORKDIR /app
 
 # Copy workspace files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/platform-sdk/package.json ./packages/platform-sdk/
-COPY platform/package.json ./platform/
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY packages/platform-sdk ./packages/platform-sdk
+COPY platform ./platform
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
-COPY packages/platform-sdk ./packages/platform-sdk
-COPY platform ./platform
-
 # Build SDK first (platform depends on it)
-RUN pnpm --filter @event-platform/platform-sdk build
+RUN pnpm --filter @event-platform/sdk build
 
-# Generate Prisma client
-RUN pnpm --filter @event-platform/platform prisma generate
+# Generate Prisma client (must be after install, in platform directory)
+WORKDIR /app/platform
+RUN pnpm prisma generate
 
 # Build platform
-RUN pnpm --filter @event-platform/platform build
+RUN pnpm build
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+# Install OpenSSL for Prisma (Debian package)
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm@8.15.0 prisma@5
 
 WORKDIR /app
 
-# Copy built artifacts
+# Copy workspace config
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+
+# Copy SDK
 COPY --from=builder /app/packages/platform-sdk/package.json ./packages/platform-sdk/
 COPY --from=builder /app/packages/platform-sdk/dist ./packages/platform-sdk/dist
+
+# Copy platform
 COPY --from=builder /app/platform/package.json ./platform/
 COPY --from=builder /app/platform/dist ./platform/dist
 COPY --from=builder /app/platform/prisma ./platform/prisma
-COPY --from=builder /app/platform/node_modules/.prisma ./platform/node_modules/.prisma
 
-# Install production dependencies only
+# Install production dependencies (includes @prisma/client)
 RUN pnpm install --frozen-lockfile --prod
+
+# Generate Prisma client for runtime
+WORKDIR /app/platform
+RUN prisma generate
 
 # Set environment
 ENV NODE_ENV=production
@@ -55,7 +63,5 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-WORKDIR /app/platform
-
 # Run migrations and start server
-CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "prisma migrate deploy && node dist/index.js"]
